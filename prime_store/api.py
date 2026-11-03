@@ -1,6 +1,7 @@
 import json
 
 import frappe
+from frappe.query_builder.functions import Avg, Count
 from frappe.utils import cint, flt
 from webshop.webshop.doctype.override_doctype.item_group import get_child_groups_for_website
 from webshop.webshop.product_data_engine.query import ProductQuery
@@ -150,18 +151,20 @@ def add_ratings(items, settings):
 	"""Average review rating (out of 5) when Webshop reviews are switched on."""
 	if not items or not settings.enable_reviews:
 		return
-	rows = frappe.get_all(
-		"Item Review",
-		filters={"website_item": ["in", [i.name for i in items]]},
-		fields=["website_item", "avg(rating) as rating", "count(name) as reviews"],
-		group_by="website_item",
+	review = frappe.qb.DocType("Item Review")
+	rows = (
+		frappe.qb.from_(review)
+		.select(review.website_item, Avg(review.rating), Count(review.name))
+		.where(review.website_item.isin([i.name for i in items]))
+		.groupby(review.website_item)
+		.run()
 	)
-	by_item = {r.website_item: r for r in rows}
+	by_item = {name: (rating, count) for name, rating, count in rows}
 	for item in items:
-		row = by_item.get(item.name)
-		if row and row.reviews:
-			item.rating = round(flt(row.rating) * 5, 1)
-			item.reviews = row.reviews
+		rating, count = by_item.get(item.name, (0, 0))
+		if count:
+			item.rating = round(flt(rating) * 5, 1)
+			item.reviews = count
 
 
 @frappe.whitelist(allow_guest=True)

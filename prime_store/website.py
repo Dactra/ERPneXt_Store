@@ -1,5 +1,6 @@
 import frappe
 from frappe import _
+from frappe.query_builder.functions import Count
 
 
 def update_website_context(context):
@@ -42,13 +43,26 @@ def get_site_name(settings):
 
 def get_categories(limit=12):
 	# Leaf groups only: parents like the default "Products" just repeat their children.
-	return frappe.get_all(
+	groups = frappe.get_all(
 		"Item Group",
 		filters={"show_in_website": 1, "is_group": 0},
 		fields=["name", "item_group_name", "route", "image", "is_group", "parent_item_group"],
 		order_by="lft asc",
 		limit=limit,
 	)
+	counts = {}
+	if groups:
+		item = frappe.qb.DocType("Website Item")
+		counts = dict(
+			frappe.qb.from_(item)
+			.select(item.item_group, Count(item.name))
+			.where((item.published == 1) & item.item_group.isin([g.name for g in groups]))
+			.groupby(item.item_group)
+			.run()
+		)
+	for g in groups:
+		g.count = counts.get(g.name, 0)
+	return groups
 
 
 def get_products(item_group=None, exclude=None, limit=8, sort=None):

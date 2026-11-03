@@ -28,11 +28,21 @@
 <header class="ps-header">
 	<a class="ps-skip" href="#ps-main">{{ _("Skip to content") }}</a>
 
-	{% if ps.perks %}
+	{% if ps.perks or ps.phone or ps.email %}
 	<div class="ps-strip">
-		<ul class="ps-wrap">
-			{% for perk in ps.perks %}<li>{{ icon("check") }}{{ _(perk) }}</li>{% endfor %}
-		</ul>
+		<div class="ps-wrap ps-strip__row">
+			{% if ps.phone or ps.email %}
+			<ul class="ps-strip__contact">
+				{% if ps.phone %}<li><a href="tel:{{ ps.phone | replace(' ', '') }}">{{ icon("phone") }}<span dir="ltr">{{ ps.phone }}</span></a></li>{% endif %}
+				{% if ps.email %}<li><a href="mailto:{{ ps.email }}">{{ icon("mail") }}<span dir="ltr">{{ ps.email }}</span></a></li>{% endif %}
+			</ul>
+			{% endif %}
+			{% if ps.perks %}
+			<ul class="ps-strip__perks">
+				{% for perk in ps.perks %}<li>{{ icon("check") }}{{ _(perk) }}</li>{% endfor %}
+			</ul>
+			{% endif %}
+		</div>
 	</div>
 	{% endif %}
 
@@ -55,19 +65,25 @@
 			</form>
 
 			<nav class="ps-tools" aria-label="{{ _('Account and cart') }}">
-				<a class="ps-tool ps-tool--account" href="{{ '/me' if logged_in else '/login' }}">
-					{{ icon("user") }}<span class="ps-tool__label">{{ _("My account") if logged_in else _("Sign in") }}</span>
-				</a>
-				{% if ps.wishlist_enabled %}
-				<a class="ps-tool" href="/wishlist" aria-label="{{ _('Wishlist') }}">
-					{{ icon("heart") }}<span class="ps-count" data-ps-count="wish" hidden></span>
-				</a>
-				{% endif %}
 				{% if ps.cart_enabled %}
 				<a class="ps-tool" href="/cart" aria-label="{{ _('Cart') if ps.checkout_enabled else _('Quote') }}">
-					{{ icon("cart") }}<span class="ps-count" data-ps-count="cart" hidden></span>
+					<span class="ps-tool__icon">{{ icon("cart") }}<span class="ps-count" data-ps-count="cart" hidden></span></span>
+					<span class="ps-tool__text" aria-hidden="true">
+						<small>{{ _("My cart") if ps.checkout_enabled else _("My quote") }}</small>
+						<b>{{ _("View cart") if ps.checkout_enabled else _("View quote") }}</b>
+					</span>
 				</a>
 				{% endif %}
+				{% if ps.wishlist_enabled %}
+				<a class="ps-tool" href="/wishlist" aria-label="{{ _('Wishlist') }}">
+					<span class="ps-tool__icon">{{ icon("heart") }}<span class="ps-count" data-ps-count="wish" hidden></span></span>
+					<span class="ps-tool__text" aria-hidden="true"><small>{{ _("My wishlist") }}</small><b>{{ _("View wishlist") }}</b></span>
+				</a>
+				{% endif %}
+				<a class="ps-tool" href="{{ '/me' if logged_in else '/login' }}" aria-label="{{ _('My account') if logged_in else _('Sign in') }}">
+					<span class="ps-tool__icon">{{ icon("user") }}</span>
+					<span class="ps-tool__text" aria-hidden="true"><small>{{ _("Welcome") }}</small><b>{{ _("My account") if logged_in else _("Sign in") }}</b></span>
+				</a>
 			</nav>
 		</div>
 	</div>
@@ -81,16 +97,28 @@
 				</button>
 				<ul class="ps-catmenu__list" id="ps-catmenu-list" hidden>
 					{% for c in ps.categories %}
-					<li><a href="/{{ c.route }}">{{ _(c.item_group_name or c.name) }}</a></li>
+					<li><a href="/{{ c.route }}">
+						<span class="ps-catmenu__img">
+							{%- if c.image %}<img src="{{ c.image | abs_url }}" alt="" loading="lazy" width="48" height="48">
+							{%- else %}<b>{{ (c.item_group_name or c.name)[:1] }}</b>{% endif -%}
+						</span>
+						<span class="ps-catmenu__text">
+							<span>{{ _(c.item_group_name or c.name) }}</span>
+							<small>{{ _("1 product") if c.count == 1 else _("{0} products").format(c.count) }}</small>
+						</span>
+					</a></li>
 					{% endfor %}
 				</ul>
 			</div>
 			{% endif %}
+			{%- set shop = ps.shop_url or '/all-products' -%}
 			<ul class="ps-nav__links">
-				<li><a href="{{ ps.shop_url or '/all-products' }}">{{ _("All products") }}</a></li>
-				{% for item in top_bar_items or [] if not item.parent_label and item.url and item.url != (ps.shop_url or '/all-products') %}
+				<li><a href="{{ home }}"{% if pathname in ('', '/', home.strip('/')) %} aria-current="page"{% endif %}>{{ _("Home") }}</a></li>
+				<li><a href="{{ shop }}"{% if pathname == shop.strip('/') %} aria-current="page"{% endif %}>{{ _("Shop") }}</a></li>
+				{% for item in top_bar_items or [] if not item.parent_label and item.url and item.url not in (shop, '/contact', home) %}
 				<li><a href="{{ item.url | abs_url }}"{% if item.open_in_new_tab %} target="_blank" rel="noopener"{% endif %}>{{ _(item.label) }}</a></li>
 				{% endfor %}
+				<li><a href="/contact"{% if pathname == 'contact' %} aria-current="page"{% endif %}>{{ _("Contact us") }}</a></li>
 			</ul>
 		</div>
 	</nav>
@@ -114,6 +142,8 @@
 		{% for item in top_bar_items or [] if not item.parent_label and item.url and item.url != (ps.shop_url or '/all-products') %}
 		<a class="ps-drawer__link" href="{{ item.url | abs_url }}">{{ _(item.label) }}</a>
 		{% endfor %}
+		<a class="ps-drawer__link" href="/contact">{{ _("Contact us") }}</a>
+		{% if ps.phone %}<a class="ps-drawer__link" href="tel:{{ ps.phone | replace(' ', '') }}">{{ icon("phone") }}<span dir="ltr">{{ ps.phone }}</span></a>{% endif %}
 	</div>
 </div>
 
