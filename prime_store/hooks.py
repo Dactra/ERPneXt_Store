@@ -19,5 +19,12 @@ update_website_context = ["prime_store.website.update_website_context"]
 
 jinja = {"methods": ["prime_store.website.get_related_products"]}
 
+# The header's trending menu is cached; rebuild it when its source data changes.
+_clear_menu = "prime_store.website.clear_trending_menu"
+doc_events = {
+	doctype: {"on_update": _clear_menu, "on_trash": _clear_menu}
+	for doctype in ("Website Item", "Item Group", "Item Price")
+}
+
 after_install = "prime_store.install.after_install"
 before_uninstall = "prime_store.install.before_uninstall"

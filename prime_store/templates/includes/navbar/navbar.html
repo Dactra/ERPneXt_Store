@@ -1,6 +1,16 @@
 {#- Prime Store header. Overrides Frappe's standard navbar for every web page. -#}
 {% from "templates/includes/prime_store/macros.html" import icon %}
 {%- set ps = ps or {} -%}
+{% macro mega_tile(t) -%}
+<a class="ps-mega__tile" href="/{{ t.route }}">
+	{% if t.image %}<img src="{{ t.image | abs_url }}" alt="" loading="lazy">{% endif %}
+	<span class="ps-mega__card">
+		<strong>{{ _(t.name) }}</strong>
+		{% if t.from_price %}<span>{{ _("Starting at {0}").format(t.from_price) }}</span>{% endif %}
+		<span class="ps-btn ps-btn--sm">{{ _("Shop") }}</span>
+	</span>
+</a>
+{%- endmacro %}
 {%- set logged_in = frappe.session.user != "Guest" -%}
 {%- set home = (url_prefix or "") ~ (home_page or "/") -%}
 {%- if home[:1] != "/" %}{% set home = "/" ~ home %}{% endif -%}
@@ -115,6 +125,25 @@
 			<ul class="ps-nav__links">
 				<li><a href="{{ home }}"{% if pathname in ('', '/', home.strip('/')) %} aria-current="page"{% endif %}>{{ _("Home") }}</a></li>
 				<li><a href="{{ shop }}"{% if pathname == shop.strip('/') %} aria-current="page"{% endif %}>{{ _("Shop") }}</a></li>
+				{% if ps.trending and ps.trending.columns %}
+				<li class="ps-mega" data-ps-menu>
+					<button type="button" class="ps-nav__btn" aria-expanded="false" aria-controls="ps-mega-trending">
+						{{ _("Trending") }}{{ icon("chevron-down", "ps-i--sm") }}
+					</button>
+					<div class="ps-mega__panel" id="ps-mega-trending" data-ps-panel hidden>
+						{% for t in ps.trending.tiles[:1] %}{{ mega_tile(t) }}{% endfor %}
+						<div class="ps-mega__cols">
+							{% for col in ps.trending.columns %}
+							<div class="ps-mega__col">
+								<a class="ps-mega__head" href="/{{ col.route }}">{{ _(col.name) }}</a>
+								<ul>{% for i in col["items"] %}<li><a href="/{{ i.route }}">{{ i.name }}</a></li>{% endfor %}</ul>
+							</div>
+							{% endfor %}
+						</div>
+						{% for t in ps.trending.tiles[1:2] %}{{ mega_tile(t) }}{% endfor %}
+					</div>
+				</li>
+				{% endif %}
 				{% for item in top_bar_items or [] if not item.parent_label and item.url and item.url not in (shop, '/contact', home) %}
 				<li><a href="{{ item.url | abs_url }}"{% if item.open_in_new_tab %} target="_blank" rel="noopener"{% endif %}>{{ _(item.label) }}</a></li>
 				{% endfor %}

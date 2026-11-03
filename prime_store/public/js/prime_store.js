@@ -120,12 +120,21 @@
 
 	function initCategoryMenu(root) {
 		var btn = root.querySelector("button");
-		var list = root.querySelector("ul");
+		var list = root.querySelector("[data-ps-panel]") || root.querySelector("ul");
+		var closing = null;
 		function set(open) {
+			clearTimeout(closing);
 			list.hidden = !open;
 			btn.setAttribute("aria-expanded", open ? "true" : "false");
 		}
 		btn.addEventListener("click", function () { set(list.hidden); });
+		// Desktop: open on hover like a classic store menu; click and keyboard still work everywhere.
+		if (window.matchMedia("(hover: hover) and (pointer: fine)").matches) {
+			root.addEventListener("mouseenter", function () { set(true); });
+			root.addEventListener("mouseleave", function () {
+				closing = setTimeout(function () { set(false); }, 150);
+			});
+		}
 		document.addEventListener("click", function (e) {
 			if (!root.contains(e.target)) set(false);
 		});

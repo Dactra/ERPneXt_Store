@@ -32,7 +32,70 @@ def get_store_context():
 		shop_url=frappe.conf.get("prime_store_shop_url") or "/all-products",
 		site_name=get_site_name(settings),
 		address=frappe.db.get_single_value("Website Settings", "address"),
+		trending=get_trending_menu(),
 	)
+
+
+TRENDING_KEY = "prime_store:trending_menu"
+TRENDING_TTL = 300  # seconds; the menu is on every page, so don't rebuild it per request
+
+
+def get_trending_menu():
+	data = frappe.cache.get_value(TRENDING_KEY)
+	if data is None:
+		data = build_trending_menu()
+		frappe.cache.set_value(TRENDING_KEY, data, expires_in_sec=TRENDING_TTL)
+	return data
+
+
+def build_trending_menu():
+	"""Mega menu: categories as link columns of their top products, two as image tiles with a from-price."""
+	from frappe.utils import fmt_money
+
+	from prime_store.api import get_list_prices
+
+	groups = [g for g in get_categories() if g.count]
+	if not groups:
+		return {}
+	price_list = frappe.get_cached_doc("Webshop Settings").price_list
+	currency = frappe.db.get_value("Price List", price_list, "currency") if price_list else None
+
+	def top_items(group, limit):
+		return frappe.get_all(
+			"Website Item",
+			filters={"published": 1, "item_group": group.name},
+			fields=["item_code", "web_item_name", "route", "website_image"],
+			order_by="ranking desc, creation desc",
+			limit=limit,
+		)
+
+	columns = [
+		{
+			"name": g.item_group_name or g.name,
+			"route": g.route,
+			"items": [{"name": i.web_item_name, "route": i.route} for i in top_items(g, 7)],
+		}
+		for g in groups[:3]
+	]
+
+	tiles = []
+	for g in (groups[3:] + groups[:3])[:2]:
+		items = top_items(g, 20)
+		prices = get_list_prices([i.item_code for i in items], price_list)
+		image = g.image or next((i.website_image for i in items if i.website_image), None)
+		tiles.append(
+			{
+				"name": g.item_group_name or g.name,
+				"route": g.route,
+				"image": image,
+				"from_price": fmt_money(min(prices.values()), currency=currency) if prices else None,
+			}
+		)
+	return {"columns": columns, "tiles": tiles}
+
+
+def clear_trending_menu(doc=None, method=None):
+	frappe.cache.delete_value(TRENDING_KEY)
 
 
 def get_site_name(settings):
