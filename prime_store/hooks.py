@@ -27,4 +27,5 @@ doc_events = {
 }
 
 after_install = "prime_store.install.after_install"
+after_migrate = "prime_store.install.after_migrate"
 before_uninstall = "prime_store.install.before_uninstall"

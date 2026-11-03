@@ -172,13 +172,16 @@
 		}
 	}
 
+	// The card's cart button becomes a link to the cart once the item is in it.
 	function cardAdded(btn) {
 		var link = document.createElement("a");
-		link.className = "ps-btn ps-btn--ghost ps-btn--block";
+		link.className = "ps-card__add is-added";
 		link.href = "/cart";
+		link.title = link.ariaLabel = btn.dataset.psAdded || "";
+		link.setAttribute("aria-label", btn.dataset.psAdded || "");
 		link.innerHTML = '<svg class="ps-i ps-i--check" aria-hidden="true"><use href="#ps-i-check"></use></svg>';
-		link.appendChild(document.createTextNode(btn.dataset.psAdded || ""));
 		btn.replaceWith(link);
+		link.focus();
 	}
 
 	function toggleWish(btn) {

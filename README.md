@@ -26,6 +26,7 @@
 | لينكات إضافية في الهيدر والفوتر | Website Settings: Top Bar Items / Footer Items |
 | التليفون والإيميل في الفوتر | Contact Us Settings |
 | السلة، والدفع أو طلب عرض سعر، والمفضلة، والمخزون، وعدد المنتجات في الصفحة | Webshop Settings |
+| شارة الكارت (وصل حديثًا، رائج، حصري، الأكثر مبيعًا، تخفيض) | Website Item: Store Badge |
 | الأقسام المعروضة | Item Group: Show in Website |
 | شرائح البانر | Website Slideshow باسم **Home Hero** |
 | العرضين الجانبيين جنب البانر | Website Slideshow باسم **Home Offers** (أول شريحتين) |

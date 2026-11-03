@@ -32,46 +32,59 @@
 {% macro product_card(item, settings) %}
 {%- set title = item.web_item_name or item.item_name or item.item_code -%}
 {%- set url = "/" ~ (item.route or "") -%}
+{%- set in_cart_label = _("In cart") if settings.enable_checkout else _("In quote") -%}
+{%- set out_of_stock = settings.show_stock_availability and not item.has_variants and not item.in_stock and not item.on_backorder -%}
 <article class="ps-card">
-	<a class="ps-card__media" href="{{ url }}" tabindex="-1" aria-hidden="true">
-		{%- if item.website_image %}
-		<img src="{{ item.website_image | abs_url }}" alt="" loading="lazy" decoding="async" width="400" height="400">
-		{%- else %}
-		<span class="ps-card__abbr">{{ frappe.utils.get_abbr(title) }}</span>
-		{%- endif %}
-	</a>
-	{% if item.discount %}<span class="ps-badge ps-badge--sale">-{{ item.discount }}</span>{% endif %}
-	{% if settings.enabled and settings.enable_wishlist and not item.has_variants %}
-	<button type="button" class="ps-card__wish{{ ' is-active' if item.wished else '' }}"
-		data-ps-wish="{{ item.item_code }}" aria-pressed="{{ 'true' if item.wished else 'false' }}"
-		aria-label="{{ _('Save {0} to wishlist').format(title) }}">{{ icon("heart") }}</button>
-	{% endif %}
-	<div class="ps-card__body">
-		<span class="ps-card__meta">{{ item.brand or _(item.item_group or "") }}</span>
-		<h3 class="ps-card__name"><a href="{{ url }}">{{ title }}</a></h3>
-		{% if item.rating %}<div class="ps-card__rating">{{ stars(item.rating, item.reviews) }}</div>{% endif %}
-		{% if settings.show_price and item.formatted_price %}
-		<div class="ps-price">
-			<span class="ps-price__now">{{ item.formatted_price }}</span>
-			{% if item.formatted_mrp %}<s class="ps-price__was">{{ item.formatted_mrp }}</s>{% endif %}
-		</div>
+	<div class="ps-card__stage">
+		<a class="ps-card__media" href="{{ url }}" tabindex="-1" aria-hidden="true">
+			{%- if item.website_image %}
+			<img src="{{ item.website_image | abs_url }}" alt="" loading="lazy" decoding="async" width="400" height="400">
+			{%- else %}
+			<span class="ps-card__abbr">{{ frappe.utils.get_abbr(title) }}</span>
+			{%- endif %}
+		</a>
+		{% if item.prime_store_badge %}
+		<span class="ps-tag ps-tag--{{ item.prime_store_badge | lower | replace(' ', '-') }}">{{ _(item.prime_store_badge) }}</span>
 		{% endif %}
-		{{ stock_label(item, settings) }}
-		<div class="ps-card__actions">
-			{% if item.has_variants %}
-			<a class="ps-btn ps-btn--ghost ps-btn--block" href="{{ url }}">{{ _("Choose options") }}</a>
-			{% elif can_buy(item, settings) %}
-				{% if item.in_cart %}
-				<a class="ps-btn ps-btn--ghost ps-btn--block" href="/cart">{{ icon("check") }}{{ _("In cart") if settings.enable_checkout else _("In quote") }}</a>
-				{% else %}
-				<button type="button" class="ps-btn ps-btn--block" data-ps-add="{{ item.item_code }}"
-					data-ps-added="{{ _('In cart') if settings.enable_checkout else _('In quote') }}">
-					{{ icon("cart") }}<span>{{ _("Add to cart") if settings.enable_checkout else _("Add to quote") }}</span>
-				</button>
-				{% endif %}
-			{% else %}
-			<a class="ps-btn ps-btn--ghost ps-btn--block" href="{{ url }}">{{ _("View details") }}</a>
+		<div class="ps-card__corner">
+			{% if item.discount %}<span class="ps-off">{{ _("{0} OFF").format(item.discount) }}</span>{% endif %}
+			{% if settings.enabled and settings.enable_wishlist and not item.has_variants %}
+			<button type="button" class="ps-card__wish{{ ' is-active' if item.wished else '' }}"
+				data-ps-wish="{{ item.item_code }}" aria-pressed="{{ 'true' if item.wished else 'false' }}"
+				aria-label="{{ _('Save {0} to wishlist').format(title) }}">{{ icon("heart") }}</button>
 			{% endif %}
+		</div>
+		{% if out_of_stock %}<span class="ps-card__oos">{{ _("Out of stock") }}</span>{% endif %}
+	</div>
+	<div class="ps-card__body">
+		<div class="ps-card__top">
+			<span class="ps-card__meta">{{ _(item.item_group or "") }}</span>
+			{% if item.rating %}
+			<span class="ps-rating" aria-label="{{ _('Rated {0} out of 5').format(item.rating) }}">{{ icon("star") }}{{ item.rating }}</span>
+			{% endif %}
+		</div>
+		<h3 class="ps-card__name"><a href="{{ url }}">{{ title }}</a></h3>
+		{% if settings.show_stock_availability and item.on_backorder %}{{ stock_label(item, settings) }}{% endif %}
+		<div class="ps-card__foot">
+			{% if settings.show_price and item.formatted_price %}
+			<div class="ps-price">
+				<span class="ps-price__now">{{ item.formatted_price }}</span>
+				{% if item.formatted_mrp %}<s class="ps-price__was">{{ item.formatted_mrp }}</s>{% endif %}
+			</div>
+			{% endif %}
+			<div class="ps-card__actions">
+				{% if item.has_variants %}
+				<a class="ps-card__add" href="{{ url }}" aria-label="{{ _('Choose options') }}" title="{{ _('Choose options') }}">{{ icon("chevron") }}</a>
+				{% elif can_buy(item, settings) %}
+					{% if item.in_cart %}
+					<a class="ps-card__add is-added" href="/cart" aria-label="{{ in_cart_label }}" title="{{ in_cart_label }}">{{ icon("check") }}</a>
+					{% else %}
+					{%- set add_label = _("Add to cart") if settings.enable_checkout else _("Add to quote") -%}
+					<button type="button" class="ps-card__add" data-ps-add="{{ item.item_code }}" data-ps-added="{{ in_cart_label }}"
+						aria-label="{{ add_label }}: {{ title }}" title="{{ add_label }}">{{ icon("cart") }}</button>
+					{% endif %}
+				{% endif %}
+			</div>
 		</div>
 	</div>
 </article>

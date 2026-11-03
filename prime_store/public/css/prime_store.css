@@ -340,50 +340,95 @@ body.ps-locked { overflow: hidden; }
 .ps-card {
 	position: relative; display: flex; flex-direction: column; min-width: 0; overflow: hidden;
 	background: var(--ps-surface); border: 1px solid var(--ps-line); border-radius: var(--ps-radius);
-	transition: border-color .15s ease, box-shadow .2s ease, transform .2s ease;
+	transition: border-color .15s ease, box-shadow .2s ease;
 }
-.ps-card:hover { border-color: color-mix(in srgb, var(--ps-primary) 35%, var(--ps-line)); box-shadow: var(--ps-shadow-lg); transform: translateY(-2px); }
-@media (prefers-reduced-motion: reduce) { .ps-card:hover { transform: none; } }
-.ps-card--skeleton:hover { transform: none; box-shadow: none; border-color: var(--ps-line); }
-.ps-card__media { display: grid; place-items: center; aspect-ratio: 1; background: var(--ps-soft); }
-.ps-card__media img { width: 100%; height: 100%; object-fit: contain; padding: 10%; mix-blend-mode: multiply; }
+.ps-card:hover { border-color: color-mix(in srgb, var(--ps-primary) 35%, var(--ps-line)); box-shadow: var(--ps-shadow-lg); }
+.ps-card--skeleton:hover { box-shadow: none; border-color: var(--ps-line); }
+
+/* Image stage: grey backdrop, label top-start, discount + wishlist top-end, stock bar at the bottom */
+.ps-card__stage { position: relative; background: #f4f4f5; }
+.ps-card__media { display: grid; place-items: center; aspect-ratio: 1; }
+.ps-card__media img { width: 100%; height: 100%; object-fit: contain; padding: 12%; mix-blend-mode: multiply; transition: transform .3s ease; }
+.ps-card:hover .ps-card__media img { transform: scale(1.04); }
+@media (prefers-reduced-motion: reduce) { .ps-card:hover .ps-card__media img { transform: none; } }
 .ps-card__abbr { font-size: 2rem; font-weight: 700; color: var(--ps-primary); }
+
+.ps-tag {
+	position: absolute; inset-block-start: 10px; inset-inline-start: 10px; z-index: 1;
+	padding: 3px 9px; border-radius: 4px; color: #fff; font-size: .74rem; font-weight: 600; line-height: 1.4;
+	background: var(--ps-primary);
+}
+.ps-tag--new-arrival { background: #6abf4b; }
+.ps-tag--trending { background: #f6a77a; }
+.ps-tag--exclusive { background: #26b0c6; }
+.ps-tag--best-seller { background: #8b5cf6; }
+.ps-tag--sale { display: grid; place-items: center; width: 44px; height: 44px; padding: 0; border-radius: 50%; background: var(--ps-sale); }
+
+.ps-card__corner {
+	position: absolute; inset-block-start: 10px; inset-inline-end: 10px; z-index: 1;
+	display: flex; flex-direction: column; align-items: flex-end; gap: 8px;
+}
+.ps-off {
+	padding: 3px 8px; border-radius: 6px; background: #fff; color: var(--ps-primary);
+	font-size: .72rem; font-weight: 700; box-shadow: var(--ps-shadow); white-space: nowrap;
+}
 .ps-card__wish {
-	position: absolute; inset-block-start: 8px; inset-inline-end: 8px; z-index: 1; display: grid; place-items: center;
-	width: 40px; height: 40px; border: 0; border-radius: 50%; background: rgba(255, 255, 255, .92);
-	box-shadow: var(--ps-shadow); color: var(--ps-muted); cursor: pointer;
+	display: grid; place-items: center; width: 40px; height: 40px; border: 0; border-radius: 50%;
+	background: #fff; box-shadow: var(--ps-shadow); color: var(--ps-muted); cursor: pointer;
+	transition: opacity .15s ease;
+}
+/* Desktop: the heart appears on hover/focus (unless already saved); touch screens always show it. */
+@media (hover: hover) and (pointer: fine) {
+	.ps-card__wish:not(.is-active) { opacity: 0; }
+	.ps-card:hover .ps-card__wish, .ps-card__wish:focus-visible { opacity: 1; }
 }
 .ps-card__wish:hover, .ps-card__wish.is-active, .ps-product__wish.is-active { color: var(--ps-sale); }
 .ps-card__wish.is-active .ps-i, .ps-product__wish.is-active .ps-i { fill: currentColor; }
-.ps-card__body { display: flex; flex: 1; flex-direction: column; gap: 4px; padding: 12px; }
-.ps-card__meta { color: var(--ps-muted); font-size: .8rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.ps-card__name { font-size: .95rem !important; font-weight: 600; line-height: 1.4 !important; }
+.ps-card__oos {
+	position: absolute; inset-inline: 0; bottom: 0; padding: 4px; background: var(--ps-sale); color: #fff;
+	text-align: center; font-size: .75rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
+}
+
+.ps-card__body { display: flex; flex: 1; flex-direction: column; gap: 4px; padding: 12px 14px 14px; }
+.ps-card__top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.ps-card__meta { min-width: 0; color: var(--ps-muted); font-size: .8rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ps-rating { display: inline-flex; align-items: center; gap: 3px; flex: none; font-size: .8rem; font-weight: 600; }
+.ps-rating .ps-i { width: 14px; height: 14px; fill: #f5b301; stroke: #f5b301; }
+.ps-card__name { font-size: 1.02rem !important; font-weight: 500; line-height: 1.4 !important; }
 .ps-card__name a {
 	display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
 	color: var(--ps-ink) !important;
 }
 .ps-card__name a::after { content: ""; position: absolute; inset: 0; } /* whole card clickable */
 .ps-card:hover .ps-card__name a { color: var(--ps-primary) !important; }
-.ps-card .ps-price { font-size: 1.02rem; }
-.ps-card__actions { position: relative; z-index: 1; margin-top: auto; padding-top: 10px; }
-.ps-card__actions .ps-btn { min-height: 42px; padding: 8px 12px; font-size: .9rem; }
+.ps-card__foot { display: flex; align-items: flex-end; justify-content: space-between; gap: 8px; margin-top: auto; padding-top: 6px; }
+.ps-card .ps-price { gap: 0 8px; font-size: .92rem; }
+.ps-card .ps-price__now { color: var(--ps-primary); font-weight: 600; }
+.ps-card__actions { position: relative; z-index: 1; flex: none; }
+.ps-card__add {
+	display: grid; place-items: center; width: 44px; height: 44px; border: 1px solid var(--ps-line); border-radius: 50%;
+	background: #fff; color: var(--ps-primary) !important; cursor: pointer; transition: background-color .15s ease, color .15s ease;
+}
+.ps-card__add:hover, .ps-card__add:focus-visible { background: var(--ps-primary); border-color: var(--ps-primary); color: #fff !important; }
+.ps-card__add:disabled { opacity: .6; cursor: progress; }
+.ps-card__add.is-added { background: var(--ps-primary-soft); border-color: transparent; }
+.ps-card__add .ps-i { width: 20px; height: 20px; }
 @media (max-width: 599px) {
 	.ps-card__body { padding: 10px; }
-	.ps-card__name { font-size: .88rem !important; }
-	.ps-card__actions .ps-btn { font-size: .82rem; gap: 6px; }
-	.ps-card__actions .ps-btn .ps-i { width: 16px; height: 16px; }
+	.ps-card__name { font-size: .9rem !important; }
+	.ps-tag { font-size: .68rem; padding: 2px 6px; }
+	.ps-tag--sale { width: 38px; height: 38px; }
+	.ps-card__add { width: 40px; height: 40px; }
 }
-/* Narrow cards (2-up inside a padded section): keep the label on one line. */
-@media (max-width: 420px) { .ps-card__actions .ps-btn .ps-i { display: none; } }
 
 /* List view */
 .ps-grid--list { grid-template-columns: 1fr !important; }
 .ps-grid--list .ps-card { flex-direction: row; }
-.ps-grid--list .ps-card__media { width: 112px; flex: none; aspect-ratio: auto; min-height: 112px; }
-.ps-grid--list .ps-card__body { gap: 6px; }
-.ps-grid--list .ps-card__actions { max-width: 240px; }
+.ps-grid--list .ps-card__stage { width: 132px; flex: none; }
+.ps-grid--list .ps-card__media { height: 100%; aspect-ratio: auto; min-height: 132px; }
+.ps-grid--list .ps-card__body { gap: 6px; padding: 14px 16px; }
 .ps-grid--list .ps-card--skeleton { display: block; }
-@media (min-width: 600px) { .ps-grid--list .ps-card__media { width: 200px; } }
+@media (min-width: 600px) { .ps-grid--list .ps-card__stage { width: 220px; } }
 
 /* ---------- homepage ---------- */
 

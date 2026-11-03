@@ -120,9 +120,13 @@ class PrimeProductQuery(ProductQuery):
 	def get_page_items(self, names):
 		if not names:
 			return []
+		fields = [*self.fields, "brand"]
+		# Added by after_migrate; skip it until the first migrate has run.
+		if frappe.get_meta("Website Item").has_field("prime_store_badge"):
+			fields.append("prime_store_badge")
 		items = frappe.get_all(
 			"Website Item",
-			fields=[*self.fields, "brand"],
+			fields=fields,
 			filters={"name": ["in", names]},
 			limit_page_length=NO_LIMIT,
 		)
