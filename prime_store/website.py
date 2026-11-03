@@ -29,17 +29,22 @@ def get_store_context():
 		email=contact.email_id,
 		phone=contact.phone,
 		shop_url=frappe.conf.get("prime_store_shop_url") or "/all-products",
-		site_name=frappe.db.get_single_value("Website Settings", "app_name")
-		or frappe.db.get_single_value("System Settings", "app_name")
-		or settings.company,
+		site_name=get_site_name(settings),
 		address=frappe.db.get_single_value("Website Settings", "address"),
 	)
 
 
+def get_site_name(settings):
+	# Website Settings ships with app_name "Frappe"; until the client sets their own, show the company.
+	name = frappe.db.get_single_value("Website Settings", "app_name")
+	return name if name and name != "Frappe" else settings.company
+
+
 def get_categories(limit=12):
+	# Leaf groups only: parents like the default "Products" just repeat their children.
 	return frappe.get_all(
 		"Item Group",
-		filters={"show_in_website": 1},
+		filters={"show_in_website": 1, "is_group": 0},
 		fields=["name", "item_group_name", "route", "image", "is_group", "parent_item_group"],
 		order_by="lft asc",
 		limit=limit,

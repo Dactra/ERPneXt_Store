@@ -641,7 +641,8 @@
 
 	ready(function () {
 		try {
-			T = JSON.parse((document.getElementById("ps-i18n") || {}).textContent || "{}");
+			var strings = document.getElementById("ps-i18n");
+			T = JSON.parse((strings && strings.dataset.strings) || "{}");
 		} catch (e) {
 			T = {};
 		}

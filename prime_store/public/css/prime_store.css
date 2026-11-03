@@ -315,6 +315,8 @@ body.ps-locked { overflow: hidden; }
 	.ps-card__actions .ps-btn { font-size: .82rem; gap: 6px; }
 	.ps-card__actions .ps-btn .ps-i { width: 16px; height: 16px; }
 }
+/* Narrow cards (2-up inside a padded section): keep the label on one line. */
+@media (max-width: 420px) { .ps-card__actions .ps-btn .ps-i { display: none; } }
 
 /* List view */
 .ps-grid--list { grid-template-columns: 1fr !important; }
@@ -358,9 +360,10 @@ body.ps-locked { overflow: hidden; }
 }
 .ps-hero__nav > button:hover { background: rgba(255, 255, 255, .15); }
 .ps-dots { display: flex; gap: 4px; }
-.ps-dots button { position: relative; width: 24px; height: 24px; border: 0; padding: 0; background: transparent; cursor: pointer; }
-.ps-dots button::before { content: ""; position: absolute; inset: 7px; border-radius: 6px; background: rgba(255, 255, 255, .45); }
-.ps-dots button.is-active { width: 36px; }
+.ps-dots { gap: 0; }
+.ps-dots button { position: relative; width: 32px; height: 40px; border: 0; padding: 0; background: transparent; cursor: pointer; }
+.ps-dots button::before { content: ""; position: absolute; inset: 15px 11px; border-radius: 6px; background: rgba(255, 255, 255, .45); }
+.ps-dots button.is-active { width: 44px; }
 .ps-dots button.is-active::before { background: #fff; }
 
 .ps-promo__side { display: grid; gap: 16px; }
@@ -380,7 +383,7 @@ body.ps-locked { overflow: hidden; }
 @media (min-width: 768px) { .ps-section { margin-block: 56px; } }
 .ps-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 16px; margin-bottom: 18px; }
 .ps-head h2 { font-size: clamp(1.25rem, 2.6vw, 1.6rem); }
-.ps-head a { display: inline-flex; align-items: center; gap: 4px; color: var(--ps-primary) !important; font-weight: 600; }
+.ps-head a { display: inline-flex; align-items: center; gap: 4px; min-height: 44px; color: var(--ps-primary) !important; font-weight: 600; }
 
 .ps-cats { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); }
 @media (min-width: 768px) { .ps-cats { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 16px; } }

@@ -117,8 +117,9 @@
 	</div>
 </div>
 
-{#- Strings for prime_store.js, translated server-side with the rest of the page. -#}
-<script type="application/json" id="ps-i18n">{{ {
+{#- Strings for prime_store.js, translated server-side with the rest of the page.
+    A data attribute, not a <script>: Frappe moves scripts out of web templates and runs them as JS. -#}
+<div id="ps-i18n" hidden data-strings="{{ {
 	"added_cart": _("Added to cart"),
 	"added_quote": _("Added to quote"),
 	"wish_added": _("Saved to your wishlist"),
@@ -131,7 +132,7 @@
 	"page": _("Page {0}"),
 	"continue": _("Continue shopping"),
 	"shop_url": ps.shop_url or "/all-products",
-} | json }}</script>
+} | json | e }}"></div>
 
 {#- Frappe's website JS fills this when the language picker is enabled. -#}
 <div class="form-group mb-0 hide" id="language-switcher"><select class="form-control" aria-label="{{ _('Language') }}"></select></div>

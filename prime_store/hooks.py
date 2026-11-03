@@ -9,8 +9,11 @@ app_license = "mit"
 # www pages (header, footer, listing, product page) take precedence over Webshop's.
 required_apps = ["erpnext", "webshop"]
 
-web_include_css = ["/assets/prime_store/css/prime_store.css"]
-web_include_js = ["/assets/prime_store/js/prime_store.js"]
+from prime_store import __version__
+
+# Plain (unhashed) files: the version query makes CDNs such as Cloudflare fetch each release fresh.
+web_include_css = [f"/assets/prime_store/css/prime_store.css?v={__version__}"]
+web_include_js = [f"/assets/prime_store/js/prime_store.js?v={__version__}"]
 
 update_website_context = ["prime_store.website.update_website_context"]
 
