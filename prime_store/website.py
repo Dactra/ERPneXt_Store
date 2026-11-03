@@ -1,6 +1,7 @@
 import frappe
 from frappe import _
-from frappe.query_builder.functions import Count
+from frappe.query_builder.functions import Avg, Count
+from frappe.utils import flt
 
 
 def update_website_context(context):
@@ -94,8 +95,62 @@ def build_trending_menu():
 	return {"columns": columns, "tiles": tiles}
 
 
+def get_listing_facets(item_group=None):
+	"""Counts and extras for the listing sidebar (brand logos, tags, ratings), scoped to the page's group."""
+	try:
+		return _listing_facets(item_group)
+	except Exception:
+		frappe.log_error(title="Prime Store: listing facets")
+		return {"categories": [], "brands": {}, "tags": [], "ratings": []}
+
+
+def _listing_facets(item_group):
+	item = frappe.qb.DocType("Website Item")
+	scope = item.published == 1
+	if item_group:
+		scope &= item.item_group == item_group
+
+	brand_counts = dict(
+		frappe.qb.from_(item).select(item.brand, Count(item.name))
+		.where(scope & item.brand.isnotnull()).groupby(item.brand).run()
+	)
+	brand_images = dict(
+		frappe.get_all("Brand", filters={"name": ["in", list(brand_counts) or [""]]}, fields=["name", "image"], as_list=True)
+	)
+
+	tag = frappe.qb.DocType("Tag Link")
+	tags = (
+		frappe.qb.from_(tag).join(item).on(tag.document_name == item.name)
+		.select(tag.tag, Count(tag.name))
+		.where((tag.document_type == "Website Item") & scope)
+		.groupby(tag.tag).orderby(tag.tag).run()
+	)
+
+	ratings = []
+	if frappe.get_cached_doc("Webshop Settings").enable_reviews:
+		review = frappe.qb.DocType("Item Review")
+		averages = [
+			flt(avg) * 5
+			for _name, avg in frappe.qb.from_(review).join(item).on(review.website_item == item.name)
+			.select(review.website_item, Avg(review.rating)).where(scope).groupby(review.website_item).run()
+		]
+		ratings = [(stars, sum(1 for a in averages if a >= stars)) for stars in (4, 3, 2, 1)] if averages else []
+
+	return {
+		"categories": get_categories(limit=50),
+		"brands": {name: {"count": n, "image": brand_images.get(name)} for name, n in brand_counts.items()},
+		"tags": tags,
+		"ratings": ratings,
+	}
+
+
+HOME_CACHE_PREFIX = "prime_store:home:"
+
+
 def clear_trending_menu(doc=None, method=None):
+	"""Drop cached storefront data (trending menu, guest homepage) after catalogue changes."""
 	frappe.cache.delete_value(TRENDING_KEY)
+	frappe.cache.delete_keys(HOME_CACHE_PREFIX)
 
 
 def get_site_name(settings):

@@ -389,6 +389,8 @@
 			price_min: p.get("price_min") || "",
 			price_max: p.get("price_max") || "",
 			in_stock: p.get("in_stock") || "",
+			tags: (p.get("tags") || "").split(",").filter(Boolean),
+			rating_min: p.get("rating_min") || "",
 			start: parseInt(p.get("start"), 10) || 0,
 		};
 	};
@@ -402,6 +404,8 @@
 		if (s.price_min) p.set("price_min", s.price_min);
 		if (s.price_max) p.set("price_max", s.price_max);
 		if (s.in_stock) p.set("in_stock", "1");
+		if (s.tags.length) p.set("tags", s.tags.join(","));
+		if (s.rating_min) p.set("rating_min", s.rating_min);
 		if (start) p.set("start", start);
 		var q = p.toString();
 		return location.pathname + (q ? "?" + q : "");
@@ -416,9 +420,16 @@
 					input.checked = !!s.in_stock;
 					return;
 				}
+				if (input.name === "tag") {
+					input.checked = s.tags.indexOf(input.value) !== -1;
+					return;
+				}
 				var bag = parts[0] === "attr" ? s.attribute_filters : s.field_filters;
 				var values = bag[parts.slice(1).join(":")] || [];
 				input.checked = values.indexOf(input.value) !== -1;
+			});
+			$all('input[name="rating_min"]', this.form).forEach(function (input) {
+				input.checked = input.value === s.rating_min;
 			});
 			["price_min", "price_max"].forEach(function (name) {
 				var input = this.form.querySelector('[name="' + name + '"]');
@@ -428,7 +439,7 @@
 		if (this.sort) this.sort.value = s.sort;
 		var count = Object.keys(s.field_filters).reduce(function (n, k) { return n + s.field_filters[k].length; }, 0) +
 			Object.keys(s.attribute_filters).reduce(function (n, k) { return n + s.attribute_filters[k].length; }, 0) +
-			(s.price_min || s.price_max ? 1 : 0) + (s.in_stock ? 1 : 0);
+			(s.price_min || s.price_max ? 1 : 0) + (s.in_stock ? 1 : 0) + s.tags.length + (s.rating_min ? 1 : 0);
 		if (this.active) {
 			this.active.textContent = String(count);
 			this.active.hidden = count === 0;
@@ -439,8 +450,11 @@
 		var s = this.state;
 		s.field_filters = {};
 		s.attribute_filters = {};
+		s.tags = $all('input[name="tag"]:checked', this.form).map(function (input) { return input.value; });
+		var rating = this.form.querySelector('input[name="rating_min"]:checked');
+		s.rating_min = rating ? rating.value : "";
 		$all("input[type=checkbox]:checked", this.form).forEach(function (input) {
-			if (input.name === "in_stock") return;
+			if (input.name === "in_stock" || input.name === "tag") return;
 			var parts = input.name.split(":");
 			var bag = parts[0] === "attr" ? s.attribute_filters : s.field_filters;
 			var key = parts.slice(1).join(":");
@@ -464,8 +478,25 @@
 	Listing.prototype.bind = function () {
 		var me = this;
 		if (this.form) {
+			// Tag search box: narrows the visible tags, never filters products by itself.
+			$all("[data-ps-lookup]", this.form).forEach(function (input) {
+				var items = $all("[data-ps-lookup-item]", input.closest(".ps-filter"));
+				input.addEventListener("input", function () {
+					var q = input.value.trim().toLowerCase();
+					items.forEach(function (el) { el.hidden = q && el.dataset.psLookupItem.indexOf(q) === -1; });
+				});
+				input.addEventListener("keydown", function (e) { if (e.key === "Enter") e.preventDefault(); });
+			});
+			// Attribute values that are colour names (Red, Silver...) get a swatch.
+			$all("[data-ps-swatch]", this.form).forEach(function (el) {
+				var colour = el.dataset.psSwatch.trim().toLowerCase().replace(/\s+/g, "");
+				if (window.CSS && CSS.supports("color", colour)) {
+					el.style.background = colour;
+					el.hidden = false;
+				}
+			});
 			this.form.addEventListener("change", function (e) {
-				if (e.target.type === "number") return; // applied with the button
+				if (e.target.type === "number" || e.target.hasAttribute("data-ps-lookup")) return; // number: applied with the button
 				me.readInputs();
 				me.update(0);
 			});
@@ -542,6 +573,8 @@
 					price_min: s.price_min,
 					price_max: s.price_max,
 					in_stock: s.in_stock,
+					tags: s.tags,
+					rating_min: s.rating_min,
 					start: s.start,
 					item_group: me.itemGroup,
 				}),

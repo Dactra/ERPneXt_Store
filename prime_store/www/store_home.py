@@ -1,7 +1,7 @@
 import frappe
 from frappe import _
 
-from prime_store.website import get_categories, get_products
+from prime_store.website import HOME_CACHE_PREFIX, get_categories, get_products
 
 
 def get_context(context):
@@ -20,13 +20,31 @@ def get_context(context):
 		context.shop_url
 	)
 	context.offers = get_slides(frappe.conf.get("prime_store_offers_slideshow") or "Home Offers")[:2]
-	context.categories = _safe(get_categories, 8)
-	context.products = _safe(get_products, limit=8)
-	featured = {p.item_code for p in context.products}
-	context.new_arrivals = [
-		p for p in _safe(get_products, limit=12, sort="newest") if p.item_code not in featured
-	][:4]
-	context.brands = _safe(get_brands)
+	context.update(get_sections())
+
+
+def get_sections():
+	# Pricing every product is the slow part of this page. Guests all see the same prices, so cache
+	# their copy briefly (cleared on product/price changes); signed-in users may have their own prices.
+	if frappe.session.user != "Guest":
+		return build_sections()
+	key = f"{HOME_CACHE_PREFIX}{frappe.local.lang}"
+	data = frappe.cache.get_value(key)
+	if data is None:
+		data = build_sections()
+		frappe.cache.set_value(key, data, expires_in_sec=300)
+	return data
+
+
+def build_sections():
+	products = _safe(get_products, limit=8)
+	featured = {p.item_code for p in products}
+	return {
+		"categories": _safe(get_categories, 8),
+		"products": products,
+		"new_arrivals": [p for p in _safe(get_products, limit=12, sort="newest") if p.item_code not in featured][:4],
+		"brands": _safe(get_brands),
+	}
 
 
 def _safe(fn, *args, **kwargs):

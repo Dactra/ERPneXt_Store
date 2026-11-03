@@ -17,12 +17,16 @@ class PrimeProductQuery(ProductQuery):
 	only the ordering and slicing of the matched Website Items happen here.
 	"""
 
-	def __init__(self, sort=None, price_min=None, price_max=None, in_stock=False, page_length=None):
+	def __init__(
+		self, sort=None, price_min=None, price_max=None, in_stock=False, page_length=None, tags=None, rating_min=None
+	):
 		super().__init__()
 		self.sort = sort if sort in SORTS else "ranking"
 		self.price_min = flt(price_min) if price_min not in (None, "") else None
 		self.price_max = flt(price_max) if price_max not in (None, "") else None
 		self.in_stock = cint(in_stock) and self.settings.show_stock_availability
+		self.tags = [t for t in (tags or []) if t]
+		self.rating_min = flt(rating_min) if self.settings.enable_reviews else 0
 		if page_length:
 			self.page_length = cint(page_length)
 		self.price_range = None
@@ -102,6 +106,19 @@ class PrimeProductQuery(ProductQuery):
 			unique = [r for r in unique if r.price is not None and r.price <= self.price_max]
 		if self.in_stock:
 			unique = [r for r in unique if self.row_in_stock(r)]
+		if self.tags:
+			# Any of the selected tags (Frappe's own document tags on Website Item).
+			tagged = set(
+				frappe.get_all(
+					"Tag Link",
+					filters={"document_type": "Website Item", "tag": ["in", self.tags]},
+					pluck="document_name",
+				)
+			)
+			unique = [r for r in unique if r.name in tagged]
+		if self.rating_min:
+			ratings = get_average_ratings([r.name for r in unique])
+			unique = [r for r in unique if ratings.get(r.name, 0) >= self.rating_min]
 
 		if self.sort == "newest":
 			unique.sort(key=lambda r: r.creation, reverse=True)
@@ -155,20 +172,32 @@ def add_ratings(items, settings):
 	"""Average review rating (out of 5) when Webshop reviews are switched on."""
 	if not items or not settings.enable_reviews:
 		return
-	review = frappe.qb.DocType("Item Review")
-	rows = (
-		frappe.qb.from_(review)
-		.select(review.website_item, Avg(review.rating), Count(review.name))
-		.where(review.website_item.isin([i.name for i in items]))
-		.groupby(review.website_item)
-		.run()
-	)
-	by_item = {name: (rating, count) for name, rating, count in rows}
+	by_item = get_review_stats([i.name for i in items])
 	for item in items:
 		rating, count = by_item.get(item.name, (0, 0))
 		if count:
 			item.rating = round(flt(rating) * 5, 1)
 			item.reviews = count
+
+
+def get_review_stats(names):
+	"""{website_item: (average rating 0-1, review count)}"""
+	if not names:
+		return {}
+	review = frappe.qb.DocType("Item Review")
+	rows = (
+		frappe.qb.from_(review)
+		.select(review.website_item, Avg(review.rating), Count(review.name))
+		.where(review.website_item.isin(names))
+		.groupby(review.website_item)
+		.run()
+	)
+	return {name: (rating, count) for name, rating, count in rows}
+
+
+def get_average_ratings(names):
+	"""{website_item: average rating out of 5}"""
+	return {name: flt(rating) * 5 for name, (rating, _count) in get_review_stats(names).items()}
 
 
 @frappe.whitelist(allow_guest=True)
@@ -187,8 +216,16 @@ def get_product_filter_data(query_args=None):
 	if isinstance(attribute_filters, str):
 		attribute_filters = json.loads(attribute_filters)
 
+	tags = args.tags or []
+	if isinstance(tags, str):
+		tags = json.loads(tags) if tags.startswith("[") else tags.split(",")
 	engine = PrimeProductQuery(
-		sort=args.sort, price_min=args.price_min, price_max=args.price_max, in_stock=args.in_stock
+		sort=args.sort,
+		price_min=args.price_min,
+		price_max=args.price_max,
+		in_stock=args.in_stock,
+		tags=tags,
+		rating_min=args.rating_min,
 	)
 	start = max(cint(args.start), 0)
 	try:

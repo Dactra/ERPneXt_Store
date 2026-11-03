@@ -27,6 +27,7 @@
 | التليفون والإيميل في الفوتر | Contact Us Settings |
 | السلة، والدفع أو طلب عرض سعر، والمفضلة، والمخزون، وعدد المنتجات في الصفحة | Webshop Settings |
 | شارة الكارت (وصل حديثًا، رائج، حصري، الأكثر مبيعًا، تخفيض) | Website Item: Store Badge |
+| وسوم الفلتر (Tags) | التاجز (Tags) بتاعة Website Item |
 | الأقسام المعروضة | Item Group: Show in Website |
 | شرائح البانر | Website Slideshow باسم **Home Hero** |
 | العرضين الجانبيين جنب البانر | Website Slideshow باسم **Home Offers** (أول شريحتين) |
@@ -48,5 +49,5 @@ bench --site SITE set-config prime_store_shop_url "/all-products"
 
 - فلتر السعر والترتيب بالسعر بيعتمدوا على سعر قائمة الأسعار (Price List) اللي في Webshop Settings. السعر اللي بيظهر في الكارت هو السعر النهائي بعد قواعد التسعير.
 - زرار "أضف للسلة" بيظهر بنفس شروط Webshop: لازم يكون للمنتج سعر، ويكون متوفر في المخزون أو `Allow items not in stock` مفعّلة.
-- الخط (IBM Plex Sans Arabic) بيتحمّل من Google Fonts.
+- الخط (IBM Plex Sans Arabic، رخصة OFL) متخزّن في `public/fonts` ومش بيتحمّل من Google، عشان سرعة الصفحة.
 - الصور والأيقونات لازم تكون ملكك. ماتنسخش ملفات من themes مدفوعة أو من مواقع تانية.
