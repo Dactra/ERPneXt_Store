@@ -1,6 +1,7 @@
 import frappe
 from frappe import _
-from frappe.utils import fmt_money
+
+from prime_store.website import get_categories, get_products
 
 
 def get_context(context):
@@ -9,82 +10,60 @@ def get_context(context):
 	context.no_breadcrumbs = 1
 	context.title = _("Home")
 
-	# Per-client settings live in site_config.json, never in code.
-	context.announcement = frappe.conf.get("prime_store_announcement") or _("Big deals this week")
+	# Per-client settings live in site_config.json, never in code. Unset means the block is hidden.
+	context.announcement = frappe.conf.get("prime_store_announcement")
 	context.deal_end = frappe.conf.get("prime_store_deal_end")  # e.g. "2026-12-31T23:59:00"
 	context.shop_url = frappe.conf.get("prime_store_shop_url") or "/all-products"
 
-	context.slides = get_slides(context.shop_url)
-	context.categories = _safe(get_categories)
-	context.products = _safe(get_products)
+	context.settings = frappe.get_cached_doc("Webshop Settings")
+	context.slides = get_slides(frappe.conf.get("prime_store_slideshow") or "Home Hero") or default_slides(
+		context.shop_url
+	)
+	context.offers = get_slides(frappe.conf.get("prime_store_offers_slideshow") or "Home Offers")[:2]
+	context.categories = _safe(get_categories, 8)
+	context.products = _safe(get_products, limit=8)
+	featured = {p.item_code for p in context.products}
+	context.new_arrivals = [
+		p for p in _safe(get_products, limit=12, sort="newest") if p.item_code not in featured
+	][:4]
 	context.brands = _safe(get_brands)
 
 
-def _safe(fn):
+def _safe(fn, *args, **kwargs):
 	try:
-		return fn()
+		return fn(*args, **kwargs)
 	except Exception:
 		frappe.log_error(title="Prime Store: homepage data")
 		return []
 
 
-def get_slides(shop_url):
-	"""Slides come from a Website Slideshow named 'Home Hero', so clients edit them from the UI."""
-	name = frappe.conf.get("prime_store_slideshow") or "Home Hero"
-	if frappe.db.exists("Website Slideshow", name):
-		doc = frappe.get_doc("Website Slideshow", name)
-		slides = [
-			{
-				"image": row.image,
-				"heading": row.heading,
-				"description": row.description,
-				"url": row.url or shop_url,
-			}
-			for row in doc.slideshow_items
-		]
-		if slides:
-			return slides
-
+def get_slides(name):
+	"""Slides come from a Website Slideshow, so clients edit them from the UI."""
+	if not frappe.db.exists("Website Slideshow", name):
+		return []
+	doc = frappe.get_cached_doc("Website Slideshow", name)
 	return [
-		{"heading": _("Power for every day"), "description": _("New devices, delivered fast."), "url": shop_url},
-		{"heading": _("Best in gaming"), "description": _("Laptops, consoles and accessories."), "url": shop_url},
-		{"heading": _("Sound that moves you"), "description": _("Headphones and speakers on sale."), "url": shop_url},
+		{"image": row.image, "heading": row.heading, "description": row.description, "url": row.url}
+		for row in doc.slideshow_items
+		if row.heading or row.image
 	]
 
 
-def get_categories():
-	return frappe.get_all(
-		"Item Group",
-		filters={"show_in_website": 1, "is_group": 0},
-		fields=["name", "route", "image"],
-		order_by="modified desc",
-		limit=8,
-	)
-
-
-def get_products():
-	items = frappe.get_all(
-		"Website Item",
-		filters={"published": 1},
-		fields=["name", "item_code", "web_item_name", "route", "website_image", "brand"],
-		order_by="ranking desc, modified desc",
-		limit=8,
-	)
-	price_list = frappe.db.get_single_value("Webshop Settings", "price_list")
-	for item in items:
-		item.price = None
-		if not price_list:
-			continue
-		price = frappe.db.get_value(
-			"Item Price",
-			{"item_code": item.item_code, "price_list": price_list, "selling": 1},
-			["price_list_rate", "currency"],
-			as_dict=True,
-		)
-		if price:
-			item.price = fmt_money(price.price_list_rate, currency=price.currency)
-	return items
+def default_slides(shop_url):
+	return [
+		{"heading": _("Power for every day"), "description": _("Phones, laptops and accessories in one place."), "url": shop_url},
+		{"heading": _("Best in gaming"), "description": _("Laptops, consoles and accessories."), "url": shop_url},
+		{"heading": _("Sound that moves you"), "description": _("Headphones and speakers for every budget."), "url": shop_url},
+	]
 
 
 def get_brands():
-	return frappe.get_all("Brand", fields=["name", "image"], order_by="modified desc", limit=8)
+	"""Only brands that have published products, so every brand link shows results."""
+	used = frappe.get_all(
+		"Website Item", filters={"published": 1, "brand": ["is", "set"]}, pluck="brand", distinct=True
+	)
+	if not used:
+		return []
+	return frappe.get_all(
+		"Brand", filters={"name": ["in", used]}, fields=["name", "image"], order_by="name asc", limit=12
+	)

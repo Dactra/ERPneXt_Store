@@ -1,0 +1,78 @@
+{#- Overrides Webshop's product page layout. Context comes from WebsiteItem.get_context. -#}
+{% extends "templates/web.html" %}
+{% from "templates/includes/prime_store/macros.html" import product_card %}
+{% from "webshop/templates/includes/macros.html" import recommended_item_row %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block breadcrumbs %}
+<div class="item-breadcrumbs small text-muted">
+	{% include "templates/includes/breadcrumbs.html" %}
+</div>
+{% endblock %}
+
+{% block page_content %}
+{%- set settings = shopping_cart.cart_settings -%}
+<div class="ps ps-product">
+	<div class="ps-product__top" itemscope itemtype="http://schema.org/Product">
+		{% include "templates/generators/item/item_image.html" %}
+		{% include "templates/generators/item/item_details.html" %}
+	</div>
+
+	{%- set long_description = doc.web_long_description if frappe.utils.strip_html(doc.web_long_description or "") else doc.description -%}
+	{% if frappe.utils.strip_html(long_description or "") %}
+	<section class="ps-product__section" aria-labelledby="ps-desc">
+		<h2 id="ps-desc">{{ _("Description") }}</h2>
+		<div class="ps-prose" itemprop="description">{{ long_description | safe }}</div>
+	</section>
+	{% endif %}
+
+	{% if show_tabs and tabs %}
+	<section class="ps-product__section">
+		{{ web_block("Section with Tabs", values=tabs, add_container=0, add_top_padding=0, add_bottom_padding=0) }}
+	</section>
+	{% elif website_specifications %}
+	<section class="ps-product__section" aria-labelledby="ps-specs">
+		<h2 id="ps-specs">{{ _("Specifications") }}</h2>
+		<table class="ps-specs">
+			{% for d in website_specifications %}
+			<tr><th scope="row">{{ _(d.label) }}</th><td>{{ _(d.description) }}</td></tr>
+			{% endfor %}
+		</table>
+	</section>
+	{% endif %}
+
+	{% if doc.website_content %}
+	<section class="ps-product__section ps-prose">{{ doc.website_content }}</section>
+	{% endif %}
+
+	{% if settings.enable_reviews and not doc.has_variants %}
+	<section class="ps-product__section ps-product__reviews">
+		{% include "templates/generators/item/item_reviews.html" %}
+	</section>
+	{% endif %}
+
+	{% if recommended_items and settings.enable_recommendations %}
+	<section class="ps-product__section" aria-labelledby="ps-recommended">
+		<h2 id="ps-recommended">{{ _("Recommended") }}</h2>
+		<div class="ps-recommended">{% for item in recommended_items %}{{ recommended_item_row(item) }}{% endfor %}</div>
+	</section>
+	{% else %}
+	{%- set related = get_related_products(doc) -%}
+	{% if related %}
+	<section class="ps-product__section" aria-labelledby="ps-related">
+		<h2 id="ps-related">{{ _("Similar products") }}</h2>
+		<div class="ps-grid ps-grid--rail">{% for item in related %}{{ product_card(item, settings) }}{% endfor %}</div>
+	</section>
+	{% endif %}
+	{% endif %}
+</div>
+{% endblock %}
+
+{% block base_scripts %}
+<!-- js should be loaded in body! -->
+<script type="text/javascript" src="/assets/frappe/js/lib/jquery/jquery.min.js"></script>
+{{ include_script("frappe-web.bundle.js") }}
+{{ include_script("controls.bundle.js") }}
+{{ include_script("dialog.bundle.js") }}
+{% endblock %}

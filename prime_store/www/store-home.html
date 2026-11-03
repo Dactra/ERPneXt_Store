@@ -1,65 +1,88 @@
 {% extends "templates/web.html" %}
+{% from "templates/includes/prime_store/macros.html" import product_card, icon %}
 
 {% block title %}{{ _("Home") }}{% endblock %}
 
 {% block page_content %}
-<div class="ps">
+<div class="ps ps-home">
 
-	<div class="ps-topbar">{{ announcement }}</div>
-
-	<section class="ps-hero" data-ps-slider aria-roledescription="carousel" aria-label="{{ _('Featured offers') }}">
-		{% for s in slides %}
-		<article class="ps-slide ps-slide--{{ loop.index0 % 3 }}{% if loop.first %} is-active{% endif %}">
-			{% if s.image %}<img class="ps-slide__img" src="{{ s.image }}" alt="" loading="{{ 'eager' if loop.first else 'lazy' }}">{% endif %}
-			<div class="ps-slide__copy">
-				<h1>{{ s.heading }}</h1>
-				{% if s.description %}<p>{{ s.description }}</p>{% endif %}
-				<a class="ps-btn ps-btn--light" href="{{ s.url }}">{{ _("Shop now") }}</a>
-			</div>
-		</article>
-		{% endfor %}
-		{% if slides|length > 1 %}
-		<div class="ps-hero__nav">
-			<button type="button" data-ps-prev aria-label="{{ _('Previous') }}">&#8249;</button>
-			<div class="ps-dots">
-				{% for s in slides %}<button type="button" data-ps-dot="{{ loop.index0 }}" aria-label="{{ loop.index }}"{% if loop.first %} class="is-active"{% endif %}></button>{% endfor %}
-			</div>
-			<button type="button" data-ps-next aria-label="{{ _('Next') }}">&#8250;</button>
-		</div>
-		{% endif %}
-	</section>
+	{% if announcement %}<div class="ps-announce">{{ announcement }}</div>{% endif %}
 
 	<div class="ps-wrap">
+		<div class="ps-promo{{ ' ps-promo--split' if offers else '' }}">
+			<section class="ps-hero" data-ps-slider aria-roledescription="carousel" aria-label="{{ _('Featured offers') }}">
+				{% for s in slides %}
+				<article class="ps-slide ps-slide--{{ loop.index0 % 3 }}{% if loop.first %} is-active{% endif %}"
+					aria-roledescription="slide" aria-label="{{ loop.index }} / {{ slides | length }}"{% if not loop.first %} aria-hidden="true"{% endif %}>
+					{% if s.image %}<img class="ps-slide__img" src="{{ s.image | abs_url }}" alt="" {% if loop.first %}fetchpriority="high"{% else %}loading="lazy"{% endif %}>{% endif %}
+					<div class="ps-slide__copy">
+						{% if loop.first %}<h1>{{ s.heading }}</h1>{% else %}<h2>{{ s.heading }}</h2>{% endif %}
+						{% if s.description %}<p>{{ s.description }}</p>{% endif %}
+						<a class="ps-btn ps-btn--light" href="{{ s.url or shop_url }}"{% if not loop.first %} tabindex="-1"{% endif %}>{{ _("Shop now") }}</a>
+					</div>
+				</article>
+				{% endfor %}
+				{% if slides | length > 1 %}
+				<div class="ps-hero__nav">
+					<button type="button" data-ps-prev aria-label="{{ _('Previous') }}">{{ icon("chevron", "ps-flip") }}</button>
+					<div class="ps-dots">
+						{% for s in slides %}<button type="button" data-ps-dot="{{ loop.index0 }}" aria-label="{{ _('Slide {0}').format(loop.index) }}"{% if loop.first %} class="is-active" aria-current="true"{% endif %}></button>{% endfor %}
+					</div>
+					<button type="button" data-ps-next aria-label="{{ _('Next') }}">{{ icon("chevron") }}</button>
+				</div>
+				{% endif %}
+			</section>
+
+			{% if offers %}
+			<div class="ps-promo__side">
+				{% for o in offers %}
+				<a class="ps-tile ps-tile--{{ loop.index0 }}" href="{{ o.url or shop_url }}">
+					{% if o.image %}<img src="{{ o.image | abs_url }}" alt="" loading="lazy">{% endif %}
+					<span class="ps-tile__copy">
+						<strong>{{ o.heading }}</strong>
+						{% if o.description %}<span>{{ o.description }}</span>{% endif %}
+						<span class="ps-tile__cta">{{ _("Shop now") }} {{ icon("chevron", "ps-i--sm") }}</span>
+					</span>
+				</a>
+				{% endfor %}
+			</div>
+			{% endif %}
+		</div>
 
 		{% if categories %}
-		<section class="ps-section">
+		<section class="ps-section" aria-labelledby="ps-h-cats">
 			<header class="ps-head">
-				<h2>{{ _("Popular categories") }}</h2>
-				<p>{{ _("We add new products every day.") }}</p>
+				<h2 id="ps-h-cats">{{ _("Popular categories") }}</h2>
+				<a href="{{ shop_url }}">{{ _("View all") }} {{ icon("chevron", "ps-i--sm") }}</a>
 			</header>
 			<div class="ps-cats">
 				{% for c in categories %}
-				<a class="ps-cat" href="/{{ c.route or c.name }}">
+				<a class="ps-cat" href="/{{ c.route }}">
 					<span class="ps-cat__img">
-						{% if c.image %}<img src="{{ c.image }}" alt="" loading="lazy">{% else %}<b>{{ c.name[:1] }}</b>{% endif %}
+						{% if c.image %}<img src="{{ c.image | abs_url }}" alt="" loading="lazy" width="160" height="160">{% else %}<b>{{ (c.item_group_name or c.name)[:1] }}</b>{% endif %}
 					</span>
-					<span class="ps-cat__name">{{ c.name }}</span>
+					<span class="ps-cat__name">{{ _(c.item_group_name or c.name) }}</span>
 				</a>
 				{% endfor %}
 			</div>
 		</section>
 		{% endif %}
 
-		<section class="ps-offers">
-			<a class="ps-offer ps-offer--a" href="{{ shop_url }}">
-				<strong>{{ _("Get 10% off accessories") }}</strong>
-				<span>{{ _("Cases, chargers and cables at great prices.") }}</span>
-			</a>
-			<a class="ps-offer ps-offer--b" href="{{ shop_url }}">
-				<strong>{{ _("Free shipping over the minimum order") }}</strong>
-				<span>{{ _("Free returns on every order.") }}</span>
-			</a>
+		{% if products %}
+		<section class="ps-section" aria-labelledby="ps-h-featured">
+			<header class="ps-head">
+				<h2 id="ps-h-featured">{{ _("Featured products") }}</h2>
+				<a href="{{ shop_url }}">{{ _("View all") }} {{ icon("chevron", "ps-i--sm") }}</a>
+			</header>
+			<div class="ps-grid">{% for p in products %}{{ product_card(p, settings) }}{% endfor %}</div>
 		</section>
+		{% else %}
+		<section class="ps-state">
+			<span class="ps-state__icon">{{ icon("box") }}</span>
+			<h2>{{ _("Products are on the way") }}</h2>
+			<p>{{ _("Our catalogue is being updated. Please check back soon.") }}</p>
+		</section>
+		{% endif %}
 
 		{% if deal_end %}
 		<section class="ps-deal" data-ps-countdown="{{ deal_end }}"
@@ -74,56 +97,28 @@
 		</section>
 		{% endif %}
 
-		{% if products %}
-		<section class="ps-section">
+		{% if new_arrivals %}
+		<section class="ps-section" aria-labelledby="ps-h-new">
 			<header class="ps-head">
-				<h2>{{ _("Featured products") }}</h2>
-				<a href="{{ shop_url }}">{{ _("View all") }}</a>
+				<h2 id="ps-h-new">{{ _("New arrivals") }}</h2>
+				<a href="{{ shop_url }}?sort=newest">{{ _("View all") }} {{ icon("chevron", "ps-i--sm") }}</a>
 			</header>
-			<div class="ps-grid">
-				{% for p in products %}
-				<a class="ps-card" href="/{{ p.route }}">
-					<span class="ps-card__img">
-						{% if p.website_image %}<img src="{{ p.website_image }}" alt="{{ p.web_item_name }}" loading="lazy">{% endif %}
-					</span>
-					{% if p.brand %}<span class="ps-card__brand">{{ p.brand }}</span>{% endif %}
-					<span class="ps-card__name">{{ p.web_item_name }}</span>
-					{% if p.price %}<span class="ps-card__price">{{ p.price }}</span>{% endif %}
-				</a>
-				{% endfor %}
-			</div>
+			<div class="ps-grid">{% for p in new_arrivals %}{{ product_card(p, settings) }}{% endfor %}</div>
 		</section>
 		{% endif %}
 
 		{% if brands %}
-		<section class="ps-section">
-			<header class="ps-head"><h2>{{ _("Top brands") }}</h2></header>
+		<section class="ps-section" aria-labelledby="ps-h-brands">
+			<header class="ps-head"><h2 id="ps-h-brands">{{ _("Top brands") }}</h2></header>
 			<div class="ps-brands">
 				{% for b in brands %}
-				<a class="ps-brand" href="{{ shop_url }}?field_filters=%7B%22brand%22%3A%5B%22{{ b.name | urlencode }}%22%5D%7D">
-					{% if b.image %}<img src="{{ b.image }}" alt="{{ b.name }}" loading="lazy">{% else %}{{ b.name }}{% endif %}
+				<a class="ps-brand" href="{{ shop_url }}?field_filters={{ {'brand': [b.name]} | json | urlencode }}">
+					{% if b.image %}<img src="{{ b.image | abs_url }}" alt="{{ b.name }}" loading="lazy">{% else %}{{ b.name }}{% endif %}
 				</a>
 				{% endfor %}
 			</div>
 		</section>
 		{% endif %}
-
-		<section class="ps-perks">
-			<div><strong>{{ _("Free returns") }}</strong><span>{{ _("Changed your mind? Send it back.") }}</span></div>
-			<div><strong>{{ _("Free shipping") }}</strong><span>{{ _("On orders over the minimum.") }}</span></div>
-			<div><strong>{{ _("Free support") }}</strong><span>{{ _("We reply within one business day.") }}</span></div>
-		</section>
-
-		<section class="ps-news">
-			<h2>{{ _("Subscribe to our weekly newsletter") }}</h2>
-			<form data-ps-newsletter novalidate>
-				<label class="sr-only" for="ps-email">{{ _("Email") }}</label>
-				<input id="ps-email" type="email" required placeholder="{{ _('Your email') }}" autocomplete="email">
-				<button class="ps-btn" type="submit">{{ _("Subscribe") }}</button>
-			</form>
-			<p class="ps-news__msg" data-ps-msg role="status"></p>
-		</section>
-
 	</div>
 </div>
 {% endblock %}

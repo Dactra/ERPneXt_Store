@@ -1,0 +1,8 @@
+{% extends "templates/web.html" %}
+{% from "templates/includes/prime_store/listing.html" import listing %}
+
+{% block title %}{{ _("All Products") }}{% endblock %}
+
+{% block page_content %}
+{{ listing(_("All Products"), field_filters, attribute_filters, "/all-products", settings) }}
+{% endblock %}

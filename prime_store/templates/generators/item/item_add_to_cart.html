@@ -1,0 +1,71 @@
+{#- Price, stock and the buy box. Cart rules are Webshop's; prime_store.js posts to Webshop's update_cart. -#}
+{% from "templates/includes/prime_store/macros.html" import icon %}
+{% if shopping_cart and shopping_cart.cart_settings.enabled %}
+{%- set cart_settings = shopping_cart.cart_settings -%}
+{%- set product_info = shopping_cart.product_info -%}
+{%- set price_info = product_info.price or {} -%}
+<div class="ps-buy item-cart" data-variant-item-code="{{ item_code }}">
+	{% if cart_settings.show_price and price_info %}
+	<div class="ps-price ps-price--lg" itemprop="offers" itemscope itemtype="https://schema.org/Offer">
+		<meta itemprop="price" content="{{ price_info.price_list_rate }}">
+		<meta itemprop="priceCurrency" content="{{ price_info.currency }}">
+		<span class="ps-price__now">{{ price_info.formatted_price_sales_uom }}</span>
+		{% if price_info.formatted_mrp %}
+		<s class="ps-price__was">{{ price_info.formatted_mrp }}</s>
+		<span class="ps-badge ps-badge--sale ps-badge--inline">-{{ price_info.get("formatted_discount_percent") or price_info.get("formatted_discount_rate") }}</span>
+		{% endif %}
+		{% if product_info.sales_uom and product_info.sales_uom != product_info.uom %}
+		<small class="ps-price__unit">({{ price_info.formatted_price }} / {{ product_info.uom }})</small>
+		{% endif %}
+	</div>
+	{% elif cart_settings.show_price and cart_settings.hide_price_for_guest and frappe.session.user == "Guest" %}
+	<p class="ps-buy__note"><a href="/login">{{ _("Sign in to see the price") }}</a></p>
+	{% endif %}
+
+	{% if cart_settings.show_stock_availability %}
+	<p class="ps-buy__stock">
+		{% if product_info.get("on_backorder") %}
+		<span class="ps-stock ps-stock--back">{{ _("Available on backorder") }}</span>
+		{% elif product_info.in_stock == 0 %}
+		<span class="ps-stock ps-stock--out">{{ _("Out of stock") }}</span>
+		{% elif product_info.in_stock == 1 %}
+		<span class="ps-stock ps-stock--in">{{ _("In stock") }}{% if product_info.show_stock_qty and product_info.stock_qty %} ({{ product_info.stock_qty }}){% endif %}</span>
+		{% endif %}
+	</p>
+	{% endif %}
+
+	{% if doc.offers %}
+	<ul class="ps-offers-list">
+		{% for offer in doc.offers %}
+		<li>{{ icon("check") }}<span><strong>{{ _(offer.offer_title) }}</strong>{% if offer.offer_subtitle %} {{ _(offer.offer_subtitle) }}{% endif %}</span></li>
+		{% endfor %}
+	</ul>
+	{% endif %}
+
+	{# Same condition as Webshop's own product page. #}
+	{% if price_info and (cart_settings.allow_items_not_in_stock or product_info.get("in_stock")) %}
+	<form class="ps-buy__form" data-ps-buy novalidate>
+		<div class="ps-qty">
+			<button type="button" data-ps-step="-1" aria-label="{{ _('Decrease quantity') }}">{{ icon("minus") }}</button>
+			<input type="number" name="qty" value="{{ product_info.qty or 1 }}" min="1" step="1" inputmode="numeric"
+				aria-label="{{ _('Quantity') }}">
+			<button type="button" data-ps-step="1" aria-label="{{ _('Increase quantity') }}">{{ icon("plus") }}</button>
+		</div>
+		<button type="submit" class="ps-btn ps-btn--lg ps-buy__add" data-ps-add="{{ item_code }}"
+			data-ps-added="{{ _('Added to cart') if cart_settings.enable_checkout else _('Added to quote') }}">
+			{{ icon("cart") }}<span>{{ _("Add to cart") if cart_settings.enable_checkout else _("Add to quote") }}</span>
+		</button>
+		{% if cart_settings.enable_checkout %}
+		<button type="button" class="ps-btn ps-btn--dark ps-btn--lg" data-ps-buy-now="{{ item_code }}">{{ _("Buy now") }}</button>
+		{% endif %}
+	</form>
+	<a class="ps-buy__view" href="/cart" data-ps-view-cart{% if not product_info.qty %} hidden{% endif %}>
+		{{ _("View cart") if cart_settings.enable_checkout else _("View quote") }} {{ icon("chevron", "ps-i--sm") }}
+	</a>
+	{% endif %}
+
+	{% if cart_settings.show_contact_us_button %}
+		{% include "templates/generators/item/item_inquiry.html" %}
+	{% endif %}
+</div>
+{% endif %}

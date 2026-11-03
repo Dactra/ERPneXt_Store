@@ -1,0 +1,34 @@
+{#- Product gallery: swipeable on touch (scroll snap), thumbnails on every screen size. -#}
+{%- set title = doc.web_item_name or doc.item_name -%}
+{%- if slides -%}
+	{%- set images = slides | map(attribute="image") | select | list -%}
+{%- elif doc.website_image -%}
+	{%- set images = [doc.website_image] -%}
+{%- else -%}
+	{%- set images = [] -%}
+{%- endif -%}
+<div class="ps-gallery" data-ps-gallery>
+	{% if images %}
+	<div class="ps-gallery__track" tabindex="0" aria-label="{{ _('Product images') }}">
+		{% for img in images %}
+		<figure class="ps-gallery__slide">
+			<img src="{{ img | abs_url }}" alt="{{ doc.website_image_alt or title }}{% if images|length > 1 %} ({{ loop.index }}/{{ images|length }}){% endif %}"
+				{% if loop.first %}itemprop="image" fetchpriority="high"{% else %}loading="lazy"{% endif %}
+				decoding="async" width="800" height="800">
+		</figure>
+		{% endfor %}
+	</div>
+	{% if images | length > 1 %}
+	<div class="ps-gallery__thumbs">
+		{% for img in images %}
+		<button type="button" data-ps-thumb="{{ loop.index0 }}" aria-label="{{ _('Image {0}').format(loop.index) }}"
+			{% if loop.first %}aria-current="true"{% endif %}>
+			<img src="{{ img | abs_url }}" alt="" loading="lazy" width="80" height="80">
+		</button>
+		{% endfor %}
+	</div>
+	{% endif %}
+	{% else %}
+	<div class="ps-gallery__empty" role="img" aria-label="{{ title }}">{{ frappe.utils.get_abbr(title) }}</div>
+	{% endif %}
+</div>

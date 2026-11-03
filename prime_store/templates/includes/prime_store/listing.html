@@ -1,0 +1,126 @@
+{% from "templates/includes/prime_store/macros.html" import icon, skeleton_cards %}
+
+{#- Product listing shell; prime_store.js fills results from prime_store.api.get_product_filter_data. -#}
+{% macro listing(title, field_filters, attribute_filters, clear_url, settings, item_group=None, description=None) %}
+{%- set search = frappe.form_dict.search or "" -%}
+<div class="ps ps-listing" data-ps-listing data-item-group="{{ item_group or '' }}">
+	<header class="ps-listing__head">
+		<h1>{{ _('Results for "{0}"').format(search) if search else title }}</h1>
+		<p class="ps-listing__count" data-ps-total aria-live="polite"></p>
+	</header>
+	{% if description %}<div class="ps-listing__desc">{{ description }}</div>{% endif %}
+	<div class="ps-subcats" data-ps-subcats hidden></div>
+
+	<div class="ps-listing__layout">
+		<aside class="ps-filters ps-drawer ps-drawer--side" id="ps-filters" aria-label="{{ _('Filters') }}">
+			<div class="ps-drawer__scrim" data-ps-close></div>
+			<div class="ps-drawer__panel ps-filters__panel" role="dialog" aria-label="{{ _('Filters') }}" tabindex="-1">
+				<div class="ps-filters__head">
+					<strong>{{ _("Filters") }}</strong>
+					<a href="{{ clear_url }}" data-ps-clear>{{ _("Clear all") }}</a>
+					<button type="button" class="ps-iconbtn ps-filters__close" data-ps-close aria-label="{{ _('Close') }}">{{ icon("close") }}</button>
+				</div>
+				<form class="ps-filters__form" data-ps-filter-form>
+					{% for field_filter in field_filters or [] %}
+					{%- set df = field_filter[0] -%}
+					{% if field_filter[1] %}
+					<fieldset class="ps-filter">
+						<legend>{{ _(df.label) }}</legend>
+						<div class="ps-filter__options">
+							{% for value in field_filter[1] %}
+							<label class="ps-check">
+								<input type="checkbox" name="field:{{ df.fieldname }}" value="{{ value }}">
+								<span>{{ _(value) }}</span>
+							</label>
+							{% endfor %}
+						</div>
+					</fieldset>
+					{% endif %}
+					{% endfor %}
+
+					{% for attribute in attribute_filters or [] %}
+					{% if attribute.item_attribute_values %}
+					<fieldset class="ps-filter">
+						<legend>{{ _(attribute.name) }}</legend>
+						<div class="ps-filter__options">
+							{% for value in attribute.item_attribute_values %}
+							<label class="ps-check">
+								<input type="checkbox" name="attr:{{ attribute.name }}" value="{{ value }}">
+								<span>{{ _(value) }}</span>
+							</label>
+							{% endfor %}
+						</div>
+					</fieldset>
+					{% endif %}
+					{% endfor %}
+
+					{% if settings.show_price %}
+					<fieldset class="ps-filter">
+						<legend>{{ _("Price") }}</legend>
+						<div class="ps-price-range">
+							<label><span class="sr-only">{{ _("Minimum price") }}</span>
+								<input type="number" name="price_min" min="0" inputmode="numeric" placeholder="{{ _('From') }}"></label>
+							<span aria-hidden="true">–</span>
+							<label><span class="sr-only">{{ _("Maximum price") }}</span>
+								<input type="number" name="price_max" min="0" inputmode="numeric" placeholder="{{ _('To') }}"></label>
+							<button type="submit" class="ps-btn ps-btn--sm">{{ _("Apply") }}</button>
+						</div>
+					</fieldset>
+					{% endif %}
+
+					{% if settings.show_stock_availability %}
+					<fieldset class="ps-filter">
+						<legend>{{ _("Availability") }}</legend>
+						<label class="ps-check"><input type="checkbox" name="in_stock" value="1"><span>{{ _("In stock only") }}</span></label>
+					</fieldset>
+					{% endif %}
+				</form>
+				<div class="ps-filters__foot">
+					<button type="button" class="ps-btn ps-btn--block" data-ps-close>{{ _("Show results") }}</button>
+				</div>
+			</div>
+		</aside>
+
+		<section class="ps-results" aria-label="{{ _('Products') }}">
+			<div class="ps-toolbar">
+				<button type="button" class="ps-btn ps-btn--ghost ps-toolbar__filters" data-ps-drawer="ps-filters"
+					aria-controls="ps-filters" aria-expanded="false">
+					{{ icon("filter") }}<span>{{ _("Filters") }}</span><span class="ps-count ps-count--inline" data-ps-active hidden></span>
+				</button>
+				<label class="ps-sort">
+					<span>{{ _("Sort by") }}</span>
+					<select data-ps-sort>
+						<option value="ranking">{{ _("Featured") }}</option>
+						<option value="newest">{{ _("Newest") }}</option>
+						{% if settings.show_price %}
+						<option value="price_asc">{{ _("Price: low to high") }}</option>
+						<option value="price_desc">{{ _("Price: high to low") }}</option>
+						{% endif %}
+						<option value="name">{{ _("Name") }}</option>
+					</select>
+				</label>
+				<div class="ps-view" role="group" aria-label="{{ _('View') }}">
+					<button type="button" data-ps-view="grid" aria-pressed="true" aria-label="{{ _('Grid view') }}">{{ icon("grid") }}</button>
+					<button type="button" data-ps-view="list" aria-pressed="false" aria-label="{{ _('List view') }}">{{ icon("list") }}</button>
+				</div>
+			</div>
+
+			<div class="ps-grid ps-grid--listing" data-ps-results aria-busy="true">{{ skeleton_cards(8) }}</div>
+
+			<div class="ps-state" data-ps-empty hidden>
+				<span class="ps-state__icon">{{ icon("search") }}</span>
+				<h2>{{ _("No products match your search") }}</h2>
+				<p>{{ _("Try removing some filters or searching for something else.") }}</p>
+				<a class="ps-btn" href="{{ clear_url }}">{{ _("Clear filters") }}</a>
+			</div>
+			<div class="ps-state ps-state--error" data-ps-error hidden role="alert">
+				<h2>{{ _("We couldn't load the products") }}</h2>
+				<p>{{ _("Check your connection and try again.") }}</p>
+				<button type="button" class="ps-btn" data-ps-retry>{{ _("Try again") }}</button>
+			</div>
+
+			<nav class="ps-pager" data-ps-pager aria-label="{{ _('Pages') }}" hidden></nav>
+		</section>
+	</div>
+</div>
+{% endmacro %}

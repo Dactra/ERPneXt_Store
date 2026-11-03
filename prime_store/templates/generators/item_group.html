@@ -1,0 +1,19 @@
+{#- Overrides Webshop's item group page with the Prime Store listing. Context comes from WebshopItemGroup. -#}
+{% extends "templates/web.html" %}
+{% from "templates/includes/prime_store/listing.html" import listing %}
+
+{% block breadcrumbs %}
+<div class="item-breadcrumbs small text-muted">
+	{% include "templates/includes/breadcrumbs.html" %}
+</div>
+{% endblock %}
+
+{% block page_content %}
+{% if slideshow %}
+<div class="item-group-slideshow">
+	{{ web_block("Hero Slider", values=slideshow, add_container=0, add_top_padding=0, add_bottom_padding=0) }}
+</div>
+{% endif %}
+{{ listing(_(item_group_name), field_filters, attribute_filters, "/" ~ doc.route,
+	frappe.get_cached_doc("Webshop Settings"), item_group=name, description=description) }}
+{% endblock %}

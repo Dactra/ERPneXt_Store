@@ -1,0 +1,2 @@
+{% from "templates/includes/prime_store/macros.html" import product_card %}
+{% for item in items %}{{ product_card(item, settings) }}{% endfor %}

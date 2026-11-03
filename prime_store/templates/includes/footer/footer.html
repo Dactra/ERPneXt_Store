@@ -1,0 +1,56 @@
+{#- Prime Store footer. Overrides Frappe's standard footer; every link points at a real route. -#}
+{% from "templates/includes/prime_store/macros.html" import icon %}
+{%- set ps = ps or {} -%}
+{%- set logged_in = frappe.session.user != "Guest" -%}
+{%- set shop_url = ps.shop_url or "/all-products" -%}
+<footer class="ps-footer">
+	<div class="ps-wrap ps-footer__grid">
+		<div class="ps-footer__about">
+			<a class="ps-logo ps-logo--footer" href="/">
+				{%- if footer_logo -%}<img src="{{ footer_logo | abs_url }}" alt="{{ ps.site_name or '' }}">
+				{%- else -%}<span>{{ ps.site_name or _("Home") }}</span>{%- endif -%}
+			</a>
+			{% if footer_address or ps.address %}<p class="ps-footer__address">{{ footer_address or ps.address }}</p>{% endif %}
+			<ul class="ps-footer__contact">
+				{% if ps.phone %}<li><a href="tel:{{ ps.phone | replace(' ', '') }}">{{ icon("phone") }}<span dir="ltr">{{ ps.phone }}</span></a></li>{% endif %}
+				{% if ps.email %}<li><a href="mailto:{{ ps.email }}">{{ icon("mail") }}<span dir="ltr">{{ ps.email }}</span></a></li>{% endif %}
+			</ul>
+			{% if ps.social %}
+			<ul class="ps-footer__social">
+				{% for s in ps.social %}<li><a href="{{ s.url }}" target="_blank" rel="noopener">{{ _(s.label | title) }}</a></li>{% endfor %}
+			</ul>
+			{% endif %}
+		</div>
+
+		{% if ps.categories %}
+		<nav aria-labelledby="ps-f-cats">
+			<h2 id="ps-f-cats">{{ _("Categories") }}</h2>
+			<ul>{% for c in ps.categories[:6] %}<li><a href="/{{ c.route }}">{{ _(c.item_group_name or c.name) }}</a></li>{% endfor %}</ul>
+		</nav>
+		{% endif %}
+
+		<nav aria-labelledby="ps-f-shop">
+			<h2 id="ps-f-shop">{{ _("Shop") }}</h2>
+			<ul>
+				<li><a href="{{ shop_url }}">{{ _("All products") }}</a></li>
+				{% if ps.cart_enabled %}<li><a href="/cart">{{ _("Cart") if ps.checkout_enabled else _("Quote") }}</a></li>{% endif %}
+				{% if ps.wishlist_enabled %}<li><a href="/wishlist">{{ _("Wishlist") }}</a></li>{% endif %}
+				{% for item in footer_items or [] if item.label and item.url and not item.parent_label %}
+				<li><a href="{{ item.url | abs_url }}"{% if item.open_in_new_tab %} target="_blank" rel="noopener"{% endif %}>{{ _(item.label) }}</a></li>
+				{% endfor %}
+			</ul>
+		</nav>
+
+		<nav aria-labelledby="ps-f-help">
+			<h2 id="ps-f-help">{{ _("Customer service") }}</h2>
+			<ul>
+				<li><a href="{{ '/me' if logged_in else '/login' }}">{{ _("My account") if logged_in else _("Sign in") }}</a></li>
+				<li><a href="{{ '/orders' if ps.checkout_enabled else '/quotations' }}">{{ _("My orders") if ps.checkout_enabled else _("My quotes") }}</a></li>
+				<li><a href="/contact">{{ _("Contact us") }}</a></li>
+			</ul>
+		</nav>
+	</div>
+	<div class="ps-footer__bottom">
+		<div class="ps-wrap">&copy; {{ frappe.utils.nowdate()[:4] }} {{ copyright or ps.site_name or "" }}</div>
+	</div>
+</footer>

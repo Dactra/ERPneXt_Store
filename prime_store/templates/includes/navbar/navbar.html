@@ -1,0 +1,137 @@
+{#- Prime Store header. Overrides Frappe's standard navbar for every web page. -#}
+{% from "templates/includes/prime_store/macros.html" import icon %}
+{%- set ps = ps or {} -%}
+{%- set logged_in = frappe.session.user != "Guest" -%}
+{%- set home = (url_prefix or "") ~ (home_page or "/") -%}
+{%- if home[:1] != "/" %}{% set home = "/" ~ home %}{% endif -%}
+
+<svg xmlns="http://www.w3.org/2000/svg" class="ps-sprite" aria-hidden="true" style="display:none">
+	<symbol id="ps-i-menu" viewBox="0 0 24 24"><path d="M3 6h18M3 12h18M3 18h18"/></symbol>
+	<symbol id="ps-i-close" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
+	<symbol id="ps-i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></symbol>
+	<symbol id="ps-i-user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/></symbol>
+	<symbol id="ps-i-heart" viewBox="0 0 24 24"><path d="M12 20s-7-4.4-9.2-9A5 5 0 0 1 12 6a5 5 0 0 1 9.2 5C19 15.6 12 20 12 20z"/></symbol>
+	<symbol id="ps-i-cart" viewBox="0 0 24 24"><path d="M3 4h2l2.4 11.2a2 2 0 0 0 2 1.6h7.7a2 2 0 0 0 2-1.5L21 8H6.2"/><circle cx="10" cy="20.5" r="1.3"/><circle cx="17" cy="20.5" r="1.3"/></symbol>
+	<symbol id="ps-i-check" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></symbol>
+	<symbol id="ps-i-grid" viewBox="0 0 24 24"><rect x="4" y="4" width="6.5" height="6.5" rx="1.5"/><rect x="13.5" y="4" width="6.5" height="6.5" rx="1.5"/><rect x="4" y="13.5" width="6.5" height="6.5" rx="1.5"/><rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1.5"/></symbol>
+	<symbol id="ps-i-list" viewBox="0 0 24 24"><path d="M9 6h11M9 12h11M9 18h11"/><circle cx="4.5" cy="6" r="1"/><circle cx="4.5" cy="12" r="1"/><circle cx="4.5" cy="18" r="1"/></symbol>
+	<symbol id="ps-i-chevron-down" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></symbol>
+	<symbol id="ps-i-chevron" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></symbol>
+	<symbol id="ps-i-filter" viewBox="0 0 24 24"><path d="M4 6h16M7 12h10M10 18h4"/></symbol>
+	<symbol id="ps-i-minus" viewBox="0 0 24 24"><path d="M5 12h14"/></symbol>
+	<symbol id="ps-i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+	<symbol id="ps-i-phone" viewBox="0 0 24 24"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2z"/></symbol>
+	<symbol id="ps-i-mail" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></symbol>
+	<symbol id="ps-i-box" viewBox="0 0 24 24"><path d="M3 7.5L12 3l9 4.5v9L12 21l-9-4.5z"/><path d="M3 7.5l9 4.5 9-4.5M12 12v9"/></symbol>
+</svg>
+
+<header class="ps-header">
+	<a class="ps-skip" href="#ps-main">{{ _("Skip to content") }}</a>
+
+	{% if ps.perks %}
+	<div class="ps-strip">
+		<ul class="ps-wrap">
+			{% for perk in ps.perks %}<li>{{ icon("check") }}{{ _(perk) }}</li>{% endfor %}
+		</ul>
+	</div>
+	{% endif %}
+
+	<div class="ps-header__main">
+		<div class="ps-wrap ps-header__row">
+			<button type="button" class="ps-iconbtn ps-header__menu" data-ps-drawer="ps-menu"
+				aria-controls="ps-menu" aria-expanded="false" aria-label="{{ _('Open menu') }}">{{ icon("menu") }}</button>
+
+			<a class="ps-logo" href="{{ home }}">
+				{%- if brand_html -%}{{ brand_html }}
+				{%- elif banner_image -%}<img src="{{ banner_image | abs_url }}" alt="{{ ps.site_name or _('Home') }}">
+				{%- else -%}<span>{{ ps.site_name or _("Home") }}</span>{%- endif -%}
+			</a>
+
+			<form class="ps-search" action="{{ ps.shop_url or '/all-products' }}" method="get" role="search">
+				<label class="sr-only" for="ps-q">{{ _("Search products") }}</label>
+				<input id="ps-q" name="search" type="search" value="{{ frappe.form_dict.search or '' }}"
+					placeholder="{{ _('Search for products, brands and more') }}" autocomplete="off" enterkeyhint="search">
+				<button type="submit" aria-label="{{ _('Search') }}">{{ icon("search") }}</button>
+			</form>
+
+			<nav class="ps-tools" aria-label="{{ _('Account and cart') }}">
+				<a class="ps-tool ps-tool--account" href="{{ '/me' if logged_in else '/login' }}">
+					{{ icon("user") }}<span class="ps-tool__label">{{ _("My account") if logged_in else _("Sign in") }}</span>
+				</a>
+				{% if ps.wishlist_enabled %}
+				<a class="ps-tool" href="/wishlist" aria-label="{{ _('Wishlist') }}">
+					{{ icon("heart") }}<span class="ps-count" data-ps-count="wish" hidden></span>
+				</a>
+				{% endif %}
+				{% if ps.cart_enabled %}
+				<a class="ps-tool" href="/cart" aria-label="{{ _('Cart') if ps.checkout_enabled else _('Quote') }}">
+					{{ icon("cart") }}<span class="ps-count" data-ps-count="cart" hidden></span>
+				</a>
+				{% endif %}
+			</nav>
+		</div>
+	</div>
+
+	<nav class="ps-nav" aria-label="{{ _('Main') }}">
+		<div class="ps-wrap ps-nav__row">
+			{% if ps.categories %}
+			<div class="ps-catmenu" data-ps-menu>
+				<button type="button" class="ps-catmenu__btn" aria-expanded="false" aria-controls="ps-catmenu-list">
+					{{ icon("grid") }}<span>{{ _("All categories") }}</span>{{ icon("chevron-down", "ps-i--sm") }}
+				</button>
+				<ul class="ps-catmenu__list" id="ps-catmenu-list" hidden>
+					{% for c in ps.categories %}
+					<li><a href="/{{ c.route }}">{{ _(c.item_group_name or c.name) }}</a></li>
+					{% endfor %}
+				</ul>
+			</div>
+			{% endif %}
+			<ul class="ps-nav__links">
+				<li><a href="{{ ps.shop_url or '/all-products' }}">{{ _("All products") }}</a></li>
+				{% for item in top_bar_items or [] if not item.parent_label and item.url and item.url != (ps.shop_url or '/all-products') %}
+				<li><a href="{{ item.url | abs_url }}"{% if item.open_in_new_tab %} target="_blank" rel="noopener"{% endif %}>{{ _(item.label) }}</a></li>
+				{% endfor %}
+			</ul>
+		</div>
+	</nav>
+</header>
+
+<div class="ps-drawer" id="ps-menu">
+	<div class="ps-drawer__scrim" data-ps-close></div>
+	<div class="ps-drawer__panel" role="dialog" aria-modal="true" aria-label="{{ _('Menu') }}" tabindex="-1">
+		<div class="ps-drawer__head">
+			<strong>{{ _("Menu") }}</strong>
+			<button type="button" class="ps-iconbtn" data-ps-close aria-label="{{ _('Close') }}">{{ icon("close") }}</button>
+		</div>
+		<a class="ps-drawer__link" href="{{ '/me' if logged_in else '/login' }}">{{ icon("user") }}{{ _("My account") if logged_in else _("Sign in") }}</a>
+		{% if logged_in %}<a class="ps-drawer__link" href="{{ '/orders' if ps.checkout_enabled else '/quotations' }}">{{ icon("box") }}{{ _("My orders") if ps.checkout_enabled else _("My quotes") }}</a>{% endif %}
+		{% if ps.categories %}
+		<p class="ps-drawer__title">{{ _("Categories") }}</p>
+		{% for c in ps.categories %}<a class="ps-drawer__link" href="/{{ c.route }}">{{ _(c.item_group_name or c.name) }}</a>{% endfor %}
+		{% endif %}
+		<p class="ps-drawer__title">{{ _("Shop") }}</p>
+		<a class="ps-drawer__link" href="{{ ps.shop_url or '/all-products' }}">{{ _("All products") }}</a>
+		{% for item in top_bar_items or [] if not item.parent_label and item.url and item.url != (ps.shop_url or '/all-products') %}
+		<a class="ps-drawer__link" href="{{ item.url | abs_url }}">{{ _(item.label) }}</a>
+		{% endfor %}
+	</div>
+</div>
+
+{#- Strings for prime_store.js, translated server-side with the rest of the page. -#}
+<script type="application/json" id="ps-i18n">{{ {
+	"added_cart": _("Added to cart"),
+	"added_quote": _("Added to quote"),
+	"wish_added": _("Saved to your wishlist"),
+	"wish_removed": _("Removed from your wishlist"),
+	"error": _("Something went wrong. Please try again."),
+	"products_one": _("1 product"),
+	"products_many": _("{0} products"),
+	"prev": _("Previous page"),
+	"next": _("Next page"),
+	"page": _("Page {0}"),
+	"continue": _("Continue shopping"),
+	"shop_url": ps.shop_url or "/all-products",
+} | json }}</script>
+
+{#- Frappe's website JS fills this when the language picker is enabled. -#}
+<div class="form-group mb-0 hide" id="language-switcher"><select class="form-control" aria-label="{{ _('Language') }}"></select></div>

@@ -1,0 +1,45 @@
+{% from "templates/includes/prime_store/macros.html" import icon, stars %}
+{%- set cart_settings = shopping_cart.cart_settings -%}
+{%- set group_route = frappe.db.get_value("Item Group", doc.item_group, "route") if doc.item_group else None -%}
+{%- set warranty = frappe.db.get_value("Item", doc.item_code, "warranty_period") -%}
+<div class="ps-product__info">
+	<div class="ps-product__titlebar">
+		<div>
+			{% if doc.brand %}
+			<a class="ps-product__brand" href="/all-products?field_filters={{ {'brand': [doc.brand]} | json | urlencode }}">{{ doc.brand }}</a>
+			{% endif %}
+			<h1 class="ps-product__title" itemprop="name">{{ _(doc.web_item_name) }}</h1>
+		</div>
+		{% if cart_settings.enabled and cart_settings.enable_wishlist and not has_variants %}
+		<button type="button" class="ps-iconbtn ps-product__wish{{ ' is-active' if wished else '' }}"
+			data-ps-wish="{{ doc.item_code }}" aria-pressed="{{ 'true' if wished else 'false' }}"
+			aria-label="{{ _('Save to wishlist') }}">{{ icon("heart") }}</button>
+		{% endif %}
+	</div>
+
+	<p class="ps-product__meta">
+		{% if doc.item_group %}
+		<a href="{{ '/' ~ group_route if group_route else '/all-products' }}">{{ _(doc.item_group) }}</a>
+		<span aria-hidden="true">·</span>
+		{% endif %}
+		<span>{{ _("Item Code") }}: <span dir="ltr">{{ doc.item_code }}</span></span>
+	</p>
+
+	{% if cart_settings.enable_reviews and average_rating %}
+	<a class="ps-product__rating" href="#ps-reviews">{{ stars(average_rating | float, total_reviews) }}</a>
+	{% endif %}
+
+	{% if doc.short_description %}<p class="ps-product__lead">{{ doc.short_description }}</p>{% endif %}
+
+	{% if has_variants %}
+		{% include "templates/generators/item/item_configure.html" %}
+	{% else %}
+		{% include "templates/generators/item/item_add_to_cart.html" %}
+	{% endif %}
+
+	{% if warranty %}
+	<ul class="ps-product__facts">
+		<li>{{ icon("check") }}{{ _("Warranty: {0} days").format(warranty) }}</li>
+	</ul>
+	{% endif %}
+</div>
