@@ -16,7 +16,7 @@ bench get-app webshop https://github.com/frappe/webshop
 bench --site SITE install-app webshop
 
 # 2) Prime Store (الريبو Private: استخدم توكن GitHub عنده صلاحية قراءة الريبو)
-bench get-app prime_store https://github.com/Dactra/prime_store
+bench get-app prime_store https://github.com/Dactra/ERPneXt_Store
 bench --site SITE install-app prime_store
 bench build --app prime_store
 bench --site SITE clear-cache && bench --site SITE clear-website-cache
@@ -29,7 +29,7 @@ bench --site SITE clear-cache && bench --site SITE clear-website-cache
 ضيف الإضافة لـ `apps.json` **بعد** `webshop`:
 
 ```json
-{ "name": "prime_store", "url": "https://github.com/Dactra/prime_store", "ref": "main" }
+{ "name": "prime_store", "url": "https://github.com/Dactra/ERPneXt_Store", "ref": "main" }
 ```
 
 وبعدين ابني الـ image بالطريقة العادية وشغّل `install-app` على الموقع.
