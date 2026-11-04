@@ -33,7 +33,10 @@
 	<symbol id="ps-i-phone" viewBox="0 0 24 24"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2z"/></symbol>
 	<symbol id="ps-i-mail" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></symbol>
 	<symbol id="ps-i-star" viewBox="0 0 24 24"><path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z"/></symbol>
+	<symbol id="ps-i-external" viewBox="0 0 24 24"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></symbol>
 	<symbol id="ps-i-box" viewBox="0 0 24 24"><path d="M3 7.5L12 3l9 4.5v9L12 21l-9-4.5z"/><path d="M3 7.5l9 4.5 9-4.5M12 12v9"/></symbol>
+	<symbol id="ps-i-eye" viewBox="0 0 24 24"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></symbol>
+	<symbol id="ps-i-compare" viewBox="0 0 24 24"><path d="M4 8h14l-4-4M20 16H6l4 4"/></symbol>
 </svg>
 
 <header class="ps-header">
@@ -154,26 +157,124 @@
 	</nav>
 </header>
 
-<div class="ps-drawer" id="ps-menu">
-	<div class="ps-drawer__scrim" data-ps-close></div>
-	<div class="ps-drawer__panel" role="dialog" aria-modal="true" aria-label="{{ _('Menu') }}" tabindex="-1">
-		<div class="ps-drawer__head">
-			<strong>{{ _("Menu") }}</strong>
-			<button type="button" class="ps-iconbtn" data-ps-close aria-label="{{ _('Close') }}">{{ icon("close") }}</button>
-		</div>
-		<a class="ps-drawer__link" href="{{ '/me' if logged_in else '/login' }}">{{ icon("user") }}{{ _("My account") if logged_in else _("Sign in") }}</a>
-		{% if logged_in %}<a class="ps-drawer__link" href="{{ '/orders' if ps.checkout_enabled else '/quotations' }}">{{ icon("box") }}{{ _("My orders") if ps.checkout_enabled else _("My quotes") }}</a>{% endif %}
-		{% if ps.categories %}
-		<p class="ps-drawer__title">{{ _("Categories") }}</p>
-		{% for c in ps.categories %}<a class="ps-drawer__link" href="/{{ c.route }}">{{ _(c.item_group_name or c.name) }}</a>{% endfor %}
+{#- Mobile menu: stacked panels (root, categories, sub-categories, trending); prime_store.js switches them. -#}
+{% macro mnav_head(title, back=None, url=None) -%}
+<div class="ps-mnav__head">
+	{% if back %}<button type="button" class="ps-iconbtn" data-ps-view-open="{{ back }}" aria-label="{{ _('Back') }}">{{ icon("chevron", "ps-flip") }}</button>{% endif %}
+	<strong>{{ title }}</strong>
+	{% if url %}<a class="ps-iconbtn ps-mnav__open" href="{{ url }}" aria-label="{{ _('Open {0}').format(title) }}">{{ icon("external") }}</a>{% endif %}
+	<button type="button" class="ps-iconbtn" data-ps-close aria-label="{{ _('Close') }}">{{ icon("close") }}</button>
+</div>
+{%- endmacro %}
+
+{% macro cat_thumb(c) -%}
+<span class="ps-mnav__thumb">{% if c.image %}<img src="{{ c.image | abs_url }}" alt="" loading="lazy" width="32" height="32">{% else %}<b>{{ (c.item_group_name or c.name)[:1] }}</b>{% endif %}</span>
+{%- endmacro %}
+
+{% macro cat_rows(nodes) -%}
+<ul class="ps-mnav__group">
+	{% for c in nodes if c.count %}
+	{%- set label = _(c.item_group_name or c.name) -%}
+	<li>
+		{% if c.children | selectattr("count") | list %}
+		<button type="button" class="ps-mnav__row" data-ps-view-open="cat-{{ c.lft }}">
+			{{ cat_thumb(c) }}<span class="ps-mnav__label">{{ label }} <small>({{ c.count }})</small></span>{{ icon("chevron", "ps-i--sm") }}
+		</button>
+		{% else %}
+		<a class="ps-mnav__row" href="/{{ c.route }}">{{ cat_thumb(c) }}<span class="ps-mnav__label">{{ label }} <small>({{ c.count }})</small></span></a>
 		{% endif %}
-		<p class="ps-drawer__title">{{ _("Shop") }}</p>
-		<a class="ps-drawer__link" href="{{ ps.shop_url or '/all-products' }}">{{ _("All products") }}</a>
-		{% for item in top_bar_items or [] if not item.parent_label and item.url and item.url != (ps.shop_url or '/all-products') %}
-		<a class="ps-drawer__link" href="{{ item.url | abs_url }}">{{ _(item.label) }}</a>
-		{% endfor %}
-		<a class="ps-drawer__link" href="/contact">{{ _("Contact us") }}</a>
-		{% if ps.phone %}<a class="ps-drawer__link" href="tel:{{ ps.phone | replace(' ', '') }}">{{ icon("phone") }}<span dir="ltr">{{ ps.phone }}</span></a>{% endif %}
+	</li>
+	{% endfor %}
+</ul>
+{%- endmacro %}
+
+{% macro cat_views(nodes, back) -%}
+{% for c in nodes if c.count and (c.children | selectattr("count") | list) %}
+<div class="ps-mnav__view" data-ps-view="cat-{{ c.lft }}" hidden>
+	{{ mnav_head(_(c.item_group_name or c.name), back=back, url="/" ~ c.route) }}
+	{{ cat_rows(c.children) }}
+</div>
+{{ cat_views(c.children, "cat-" ~ c.lft) }}
+{% endfor %}
+{%- endmacro %}
+
+{%- set shop = ps.shop_url or '/all-products' -%}
+<div class="ps-drawer ps-drawer--end" id="ps-menu">
+	<div class="ps-drawer__scrim" data-ps-close></div>
+	<div class="ps-drawer__panel ps-mnav" role="dialog" aria-modal="true" aria-label="{{ _('Menu') }}" tabindex="-1">
+		<div class="ps-mnav__view" data-ps-view="root">
+			<div class="ps-mnav__head ps-mnav__head--brand">
+				<a class="ps-logo" href="{{ home }}">
+					{%- if banner_image -%}<img src="{{ banner_image | abs_url }}" alt="{{ ps.site_name or '' }}">
+					{%- else -%}<span>{{ ps.site_name or _("Home") }}</span>{%- endif -%}
+				</a>
+				<button type="button" class="ps-iconbtn" data-ps-close aria-label="{{ _('Close') }}">{{ icon("close") }}</button>
+			</div>
+			{% if not logged_in %}
+			<div class="ps-mnav__auth">
+				<a class="ps-btn ps-btn--sm" href="/login">{{ _("Log in") }}</a>
+				{% if ps.signup_enabled %}<a class="ps-btn ps-btn--sm ps-btn--ghost" href="/login#signup">{{ _("Sign up") }}</a>{% endif %}
+			</div>
+			{% endif %}
+
+			<p class="ps-mnav__title">{{ _("Browse") }}</p>
+			<ul class="ps-mnav__group">
+				{% if ps.category_tree %}
+				<li><button type="button" class="ps-mnav__row ps-mnav__row--feature" data-ps-view-open="cats">
+					<span class="ps-mnav__icon">{{ icon("grid") }}</span>
+					<span class="ps-mnav__label"><b>{{ _("Shop by category") }}</b>
+						<small>{% for c in ps.category_tree %}{{ _(c.item_group_name or c.name) }}{{ "، " if not loop.last }}{% endfor %}</small></span>
+					{{ icon("chevron", "ps-i--sm") }}
+				</button></li>
+				{% endif %}
+				<li><a class="ps-mnav__row" href="{{ home }}">{{ _("Home") }}</a></li>
+				<li><a class="ps-mnav__row" href="{{ shop }}">{{ _("Shop") }}</a></li>
+				{% if ps.trending and ps.trending.columns %}
+				<li><button type="button" class="ps-mnav__row" data-ps-view-open="trending"><span class="ps-mnav__label">{{ _("Trending") }}</span>{{ icon("chevron", "ps-i--sm") }}</button></li>
+				{% endif %}
+				{% for item in top_bar_items or [] if not item.parent_label and item.url and item.url not in (shop, '/contact', home) %}
+				<li><a class="ps-mnav__row" href="{{ item.url | abs_url }}">{{ _(item.label) }}</a></li>
+				{% endfor %}
+				<li><a class="ps-mnav__row" href="/contact">{{ _("Contact us") }}</a></li>
+			</ul>
+
+			<p class="ps-mnav__title">{{ _("My account") }}</p>
+			<ul class="ps-mnav__group">
+				{% if logged_in %}
+				<li><a class="ps-mnav__row" href="/me">{{ icon("user") }}<span class="ps-mnav__label">{{ _("My account") }}</span></a></li>
+				<li><a class="ps-mnav__row" href="{{ '/orders' if ps.checkout_enabled else '/quotations' }}">{{ icon("box") }}<span class="ps-mnav__label">{{ _("My orders") if ps.checkout_enabled else _("My quotes") }}</span></a></li>
+				{% endif %}
+				{% if ps.wishlist_enabled %}
+				<li><a class="ps-mnav__row" href="/wishlist">{{ icon("heart") }}<span class="ps-mnav__label">{{ _("Wishlist") }}</span><span class="ps-mnav__badge" data-ps-count="wish" hidden></span></a></li>
+				{% endif %}
+				{% if ps.cart_enabled %}
+				<li><a class="ps-mnav__row" href="/cart">{{ icon("cart") }}<span class="ps-mnav__label">{{ _("Cart") if ps.checkout_enabled else _("Quote") }}</span><span class="ps-mnav__badge" data-ps-count="cart" hidden></span></a></li>
+				{% endif %}
+				{% if ps.phone %}
+				<li><a class="ps-mnav__row" href="tel:{{ ps.phone | replace(' ', '') }}">{{ icon("phone") }}<span class="ps-mnav__label" dir="ltr">{{ ps.phone }}</span></a></li>
+				{% endif %}
+			</ul>
+		</div>
+
+		{% if ps.category_tree %}
+		<div class="ps-mnav__view" data-ps-view="cats" hidden>
+			{{ mnav_head(_("Categories"), back="root") }}
+			{{ cat_rows(ps.category_tree) }}
+		</div>
+		{{ cat_views(ps.category_tree, "cats") }}
+		{% endif %}
+
+		{% if ps.trending and ps.trending.columns %}
+		<div class="ps-mnav__view" data-ps-view="trending" hidden>
+			{{ mnav_head(_("Trending"), back="root") }}
+			{% for col in ps.trending.columns %}
+			<p class="ps-mnav__title"><a href="/{{ col.route }}">{{ _(col.name) }}</a></p>
+			<ul class="ps-mnav__group">
+				{% for i in col["items"] %}<li><a class="ps-mnav__row" href="/{{ i.route }}">{{ i.name }}</a></li>{% endfor %}
+			</ul>
+			{% endfor %}
+		</div>
+		{% endif %}
 	</div>
 </div>
 
@@ -191,6 +292,13 @@
 	"next": _("Next page"),
 	"page": _("Page {0}"),
 	"continue": _("Continue shopping"),
+	"compare": _("Compare"),
+	"compare_now": _("Compare now"),
+	"compare_added": _("Added to compare"),
+	"compare_removed": _("Removed from compare"),
+	"compare_full": _("You can compare up to 4 products. Remove one first."),
+	"clear": _("Clear all"),
+	"compare_on": ps.compare_enabled,
 	"shop_url": ps.shop_url or "/all-products",
 } | json | e }}"></div>
 

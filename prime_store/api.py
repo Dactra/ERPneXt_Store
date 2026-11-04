@@ -6,6 +6,8 @@ from frappe.utils import cint, flt
 from webshop.webshop.doctype.override_doctype.item_group import get_child_groups_for_website
 from webshop.webshop.product_data_engine.query import ProductQuery
 
+from prime_store.prime_store.doctype.prime_store_settings.prime_store_settings import get_settings
+
 SORTS = ("ranking", "newest", "price_asc", "price_desc", "name")
 NO_LIMIT = 0
 
@@ -51,6 +53,8 @@ class PrimeProductQuery(ProductQuery):
 
 		cart_items = self.get_cart_items() if self.settings.enabled else []
 		items, _discounts = self.add_display_details(items, [], cart_items)
+		add_template_prices(items, self.settings.price_list)
+		add_color_swatches(items)
 		add_ratings(items, self.settings)
 		return {"items": items, "items_count": count}
 
@@ -73,7 +77,17 @@ class PrimeProductQuery(ProductQuery):
 				)
 			)
 		if item_codes:
-			self.filters.append(["item_code", "in", list(set.intersection(*item_codes)) or [""]])
+			matched = set.intersection(*item_codes)
+			if self.settings.hide_variants and matched:
+				# Variants aren't listed, so a variant matching (say) Black + 256GB shows its template.
+				matched |= set(
+					frappe.get_all(
+						"Item",
+						filters={"item_code": ["in", list(matched)], "variant_of": ["is", "set"]},
+						pluck="variant_of",
+					)
+				)
+			self.filters.append(["item_code", "in", list(matched) or [""]])
 
 	def get_matching_rows(self):
 		rows = frappe.get_all(
@@ -152,20 +166,138 @@ class PrimeProductQuery(ProductQuery):
 
 
 def get_list_prices(item_codes, price_list):
+	"""{item_code: lowest list rate}; a template (no Item Price allowed in v16) gets its cheapest variant's."""
 	if not item_codes or not price_list:
 		return {}
+	prices = _lowest_rates(item_codes, price_list)
+	missing = [code for code in item_codes if code not in prices]
+	if missing:
+		variants = frappe.get_all(
+			"Item", filters={"variant_of": ["in", missing], "disabled": 0}, fields=["name", "variant_of"],
+			limit_page_length=NO_LIMIT,
+		)
+		variant_prices = _lowest_rates([v.name for v in variants], price_list)
+		for v in variants:
+			rate = variant_prices.get(v.name)
+			if rate is not None:
+				prices[v.variant_of] = rate if v.variant_of not in prices else min(prices[v.variant_of], rate)
+	return prices
+
+
+def _lowest_rates(item_codes, price_list):
 	prices = {}
+	if not item_codes:
+		return prices
 	for row in frappe.get_all(
 		"Item Price",
 		filters={"item_code": ["in", item_codes], "price_list": price_list, "selling": 1},
 		fields=["item_code", "price_list_rate", "customer"],
 		limit_page_length=NO_LIMIT,
 	):
-		if row.customer:
+		if row.customer or row.price_list_rate <= 0:  # a zero rate means "not priced yet"
 			continue
 		current = prices.get(row.item_code)
 		prices[row.item_code] = row.price_list_rate if current is None else min(current, row.price_list_rate)
 	return prices
+
+
+def add_template_prices(items, price_list):
+	"""Cards for templates show "starting at" their cheapest variant (Webshop gives templates no price)."""
+	templates = [i for i in items if i.has_variants and not i.formatted_price]
+	if not templates:
+		return
+	from frappe.utils import fmt_money
+
+	currency = frappe.db.get_value("Price List", price_list, "currency") if price_list else None
+	prices = get_list_prices([i.item_code for i in templates], price_list)
+	for item in templates:
+		if item.item_code in prices:
+			item.formatted_price = fmt_money(prices[item.item_code], currency=currency)
+
+
+COMPARE_MAX = 4
+
+
+def get_compare_items(item_codes):
+	"""Products for the compare page, priced and stocked like the cards, plus their attribute values.
+
+	Returns (items, attributes): attributes is the ordered list of attribute names; each item gets
+	`specs` = {attribute: "value, value"} (a template lists what its variants offer).
+	"""
+	codes = list(dict.fromkeys(c for c in item_codes if c))[:COMPARE_MAX]
+	if not codes:
+		return [], []
+	engine = PrimeProductQuery()
+	rows = frappe.get_all(
+		"Website Item", filters={"item_code": ["in", codes], "published": 1}, fields=["name", "item_code"]
+	)
+	order = {code: i for i, code in enumerate(codes)}
+	names = [r.name for r in sorted(rows, key=lambda r: order[r.item_code])]
+	items = engine.get_page_items(names)
+	cart_items = engine.get_cart_items() if engine.settings.enabled else []
+	items, _discounts = engine.add_display_details(items, [], cart_items)
+	add_template_prices(items, engine.settings.price_list)
+	add_ratings(items, engine.settings)
+
+	shown = [i.item_code for i in items]
+	attr = frappe.qb.DocType("Item Variant Attribute")
+	variant = frappe.qb.DocType("Item")
+	attr_rows = (
+		frappe.qb.from_(attr)
+		.join(variant).on(attr.parent == variant.name)
+		.select(variant.name, variant.variant_of, attr.attribute, attr.attribute_value)
+		.where(
+			(variant.name.isin(shown) | variant.variant_of.isin(shown))
+			& (variant.disabled == 0) & attr.attribute_value.isnotnull()
+		)
+		.orderby(attr.idx).orderby(variant.name)
+		.run()
+	) if shown else []
+	attributes, specs = [], {code: {} for code in shown}
+	for name, variant_of, attribute, value in attr_rows:
+		for owner in {name, variant_of} & set(shown):
+			values = specs[owner].setdefault(attribute, [])
+			if value not in values:
+				values.append(value)
+		if attribute not in attributes:
+			attributes.append(attribute)
+	for item in items:
+		item.specs = specs.get(item.item_code, {})
+	return items, attributes
+
+
+def add_color_swatches(items, limit=5):
+	"""Templates get their variants' colours (with each colour's image) for the card swatches."""
+	templates = {i.item_code: i for i in items if i.has_variants}
+	if not templates:
+		return
+	attr = frappe.qb.DocType("Item Variant Attribute")
+	variant = frappe.qb.DocType("Item")
+	web = frappe.qb.DocType("Website Item")
+	rows = (
+		frappe.qb.from_(attr)
+		.join(variant).on(attr.parent == variant.name)
+		.left_join(web).on(web.item_code == variant.name)
+		.select(variant.variant_of, attr.attribute_value, web.website_image, variant.image)
+		.where(
+			variant.variant_of.isin(list(templates)) & (variant.disabled == 0)
+			& (attr.attribute == get_settings().swatch_attribute) & attr.attribute_value.isnotnull()
+		)
+		.orderby(variant.variant_of).orderby(variant.name)
+		.run()
+	)
+	for template, value, web_image, image in rows:
+		item = templates[template]
+		swatches = item.setdefault("swatches", [])
+		if any(s["value"] == value for s in swatches):
+			continue
+		image = web_image or image
+		# Only a picture that differs from the card's is worth swapping to.
+		swatches.append({"value": value, "image": image if image and image != item.website_image else None})
+	for item in templates.values():
+		if item.get("swatches"):
+			item.swatches_more = max(0, len(item.swatches) - limit)
+			item.swatches = item.swatches[:limit]
 
 
 def add_ratings(items, settings):
@@ -243,7 +375,7 @@ def get_product_filter_data(query_args=None):
 	sub_categories = []
 	if args.item_group:
 		sub_categories = [
-			{"name": g.name, "route": g.route}
+			{"name": g.name, "label": frappe._(g.name), "route": g.route}
 			for g in get_child_groups_for_website(args.item_group, immediate=True)
 		]
 

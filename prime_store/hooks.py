@@ -1,6 +1,6 @@
 app_name = "prime_store"
 app_title = "Prime Store"
-app_publisher = "Your Company"
+app_publisher = "Dactra"
 app_description = "Electronics storefront theme for ERPNext Webshop"
 app_email = "you@example.com"
 app_license = "mit"
@@ -9,11 +9,25 @@ app_license = "mit"
 # www pages (header, footer, listing, product page) take precedence over Webshop's.
 required_apps = ["erpnext", "webshop"]
 
+import hashlib
+import os
+
 from prime_store import __version__
 
-# Plain (unhashed) files: the version query makes CDNs such as Cloudflare fetch each release fresh.
-web_include_css = [f"/assets/prime_store/css/prime_store.css?v={__version__}"]
-web_include_js = [f"/assets/prime_store/js/prime_store.js?v={__version__}"]
+
+def _asset(path):
+	# Plain (unhashed) files: a content hash in the URL makes CDNs such as Cloudflare
+	# fetch every change fresh, including hot fixes that keep the same app version.
+	try:
+		with open(os.path.join(os.path.dirname(__file__), "public", path), "rb") as f:
+			version = hashlib.md5(f.read()).hexdigest()[:10]
+	except OSError:
+		version = __version__
+	return f"/assets/prime_store/{path}?v={version}"
+
+
+web_include_css = [_asset("css/prime_store.css")]
+web_include_js = [_asset("js/prime_store.js")]
 
 update_website_context = ["prime_store.website.update_website_context"]
 
@@ -21,6 +35,8 @@ jinja = {
 	"methods": [
 		"prime_store.website.get_related_products",
 		"prime_store.website.get_listing_facets",
+		"prime_store.website.get_starting_price",
+		"prime_store.website.get_prime_store_settings",
 	]
 }
 

@@ -1,6 +1,6 @@
 [project]
 name = "prime_store"
-authors = [{ name = "Your Company", email = "you@example.com" }]
+authors = [{ name = "Dactra" }]
 description = "Electronics storefront theme for ERPNext Webshop"
 requires-python = ">=3.10"
 readme = "README.md"

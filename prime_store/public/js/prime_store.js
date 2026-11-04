@@ -94,7 +94,22 @@
 			if (panel) panel.focus();
 		} else {
 			openDrawer = null;
+			showView(drawer, "root", false);
 			if (lastFocus && lastFocus.focus) lastFocus.focus();
+		}
+	}
+
+	// Menu panels (root -> categories -> sub-categories): one visible at a time.
+	function showView(drawer, name, focus) {
+		var views = $all("[data-ps-view]", drawer);
+		if (!views.length) return;
+		views.forEach(function (v) { v.hidden = v.dataset.psView !== name; });
+		var current = drawer.querySelector('[data-ps-view="' + name + '"]');
+		var panel = drawer.querySelector(".ps-drawer__panel");
+		if (panel) panel.scrollTop = 0;
+		if (focus && current) {
+			var first = current.querySelector("a, button");
+			if (first) first.focus();
 		}
 	}
 
@@ -103,6 +118,11 @@
 			var opener = e.target.closest("[data-ps-drawer]");
 			if (opener) {
 				setDrawer(document.getElementById(opener.dataset.psDrawer), true);
+				return;
+			}
+			var view = e.target.closest("[data-ps-view-open]");
+			if (view && openDrawer) {
+				showView(openDrawer, view.dataset.psViewOpen, true);
 				return;
 			}
 			if (openDrawer && e.target.closest("[data-ps-close]")) setDrawer(openDrawer, false);
@@ -173,16 +193,45 @@
 	}
 
 	// The card's cart button becomes a link to the cart once the item is in it.
+	// Both of the card's buy controls (round foot button, hover bar) switch together.
 	function cardAdded(btn) {
-		var link = document.createElement("a");
-		link.className = "ps-card__add is-added";
-		link.href = "/cart";
-		link.title = link.ariaLabel = btn.dataset.psAdded || "";
-		link.setAttribute("aria-label", btn.dataset.psAdded || "");
-		link.innerHTML = '<svg class="ps-i ps-i--check" aria-hidden="true"><use href="#ps-i-check"></use></svg>';
-		btn.replaceWith(link);
-		link.focus();
+		var card = btn.closest(".ps-card");
+		var buttons = card ? card.querySelectorAll("[data-ps-add]") : [btn];
+		Array.prototype.forEach.call(buttons, function (b) {
+			var label = b.dataset.psAdded || "";
+			var link = document.createElement("a");
+			link.className = b.className + " is-added";
+			link.href = "/cart";
+			link.title = label;
+			link.setAttribute("aria-label", label);
+			link.innerHTML = '<svg class="ps-i ps-i--check" aria-hidden="true"><use href="#ps-i-check"></use></svg>';
+			if (b.querySelector("span")) {
+				var text = document.createElement("span");
+				text.textContent = label;
+				link.appendChild(text);
+			}
+			b.replaceWith(link);
+			if (b === btn) link.focus();
+		});
 	}
+
+	// Colour swatches on template cards: show that colour's picture while pointed at / after a tap.
+	function showSwatch(dot) {
+		var card = dot.closest(".ps-card");
+		var img = card && card.querySelector(".ps-card__media img");
+		if (!img) return;
+		if (!img.dataset.src) img.dataset.src = img.src;
+		img.src = dot.dataset.img || img.dataset.src;
+		Array.prototype.forEach.call(card.querySelectorAll("[data-ps-swatch]"), function (d) {
+			d.classList.toggle("is-active", d === dot);
+		});
+	}
+	["mouseover", "focusin", "click"].forEach(function (type) {
+		document.addEventListener(type, function (e) {
+			var dot = e.target.closest && e.target.closest("[data-ps-swatch]");
+			if (dot) showSwatch(dot);
+		});
+	});
 
 	function toggleWish(btn) {
 		var wl = wishlist();
@@ -211,6 +260,90 @@
 		);
 	}
 
+	/* ---------- compare: up to 4 item codes kept in this browser, shown at /compare?items=… ---------- */
+
+	var COMPARE_KEY = "ps_compare";
+	var COMPARE_MAX = 4;
+
+	function compareList() {
+		try {
+			var list = JSON.parse(localStorage.getItem(COMPARE_KEY) || "[]");
+			return Array.isArray(list) ? list.filter(function (c) { return typeof c === "string" && c; }).slice(0, COMPARE_MAX) : [];
+		} catch (e) {
+			return [];
+		}
+	}
+
+	function saveCompare(list) {
+		try {
+			localStorage.setItem(COMPARE_KEY, JSON.stringify(list));
+		} catch (e) {
+			/* storage blocked: the selection just won't survive a reload */
+		}
+		syncCompare(list);
+	}
+
+	function compareUrl(list) {
+		return list.length ? "/compare?items=" + list.map(encodeURIComponent).join(",") : "/compare";
+	}
+
+	function toggleCompare(code) {
+		var list = compareList();
+		var at = list.indexOf(code);
+		if (at > -1) {
+			list.splice(at, 1);
+			alert(T.compare_removed);
+		} else if (list.length >= COMPARE_MAX) {
+			alert(T.compare_full, false);
+			return;
+		} else {
+			list.push(code);
+			alert(T.compare_added);
+		}
+		saveCompare(list);
+	}
+
+	function syncCompare(list) {
+		list = list || compareList();
+		$all("[data-ps-compare]").forEach(function (btn) {
+			var on = list.indexOf(btn.dataset.psCompare) > -1;
+			btn.classList.toggle("is-active", on);
+			btn.setAttribute("aria-pressed", on ? "true" : "false");
+		});
+		var bar = document.getElementById("ps-comparebar");
+		if (document.querySelector("[data-ps-compare-page]")) return;
+		if (!bar && list.length && T.compare_on) {
+			bar = document.createElement("div");
+			bar.id = "ps-comparebar";
+			bar.className = "ps-comparebar";
+			bar.setAttribute("role", "region");
+			bar.setAttribute("aria-label", T.compare || "");
+			bar.innerHTML =
+				'<span class="ps-comparebar__count"><svg class="ps-i" aria-hidden="true"><use href="#ps-i-compare"></use></svg><b></b></span>' +
+				'<a class="ps-btn ps-btn--sm"></a><button type="button" class="ps-comparebar__clear"></button>';
+			bar.querySelector("button").textContent = T.clear || "";
+			bar.querySelector("button").addEventListener("click", function () { saveCompare([]); });
+			document.body.appendChild(bar);
+		}
+		if (!bar) return;
+		bar.hidden = !list.length;
+		bar.querySelector("b").textContent = (T.compare || "") + " (" + list.length + "/" + COMPARE_MAX + ")";
+		var link = bar.querySelector("a");
+		link.textContent = T.compare_now || "";
+		link.href = compareUrl(list);
+	}
+
+	// The compare page shows what the URL names; keep the stored list in step with a shared link,
+	// and open the stored list when the page is visited without one.
+	function initComparePage(root) {
+		var shown = (root.dataset.items || "").split(",").filter(Boolean);
+		if (!/[?&]items=/.test(location.search)) {
+			var stored = compareList();
+			if (stored.length) return location.replace(compareUrl(stored));
+		}
+		saveCompare(shown);
+	}
+
 	function initActions() {
 		document.addEventListener("click", function (e) {
 			var add = e.target.closest("[data-ps-add]");
@@ -221,6 +354,23 @@
 			var wish = e.target.closest("[data-ps-wish]");
 			if (wish) {
 				toggleWish(wish);
+				return;
+			}
+			var cmp = e.target.closest("[data-ps-compare]");
+			if (cmp) {
+				toggleCompare(cmp.dataset.psCompare);
+				return;
+			}
+			var cmpRemove = e.target.closest("[data-ps-compare-remove]");
+			if (cmpRemove) {
+				var left = compareList().filter(function (c) { return c !== cmpRemove.dataset.psCompareRemove; });
+				saveCompare(left);
+				location.replace(compareUrl(left));
+				return;
+			}
+			if (e.target.closest("[data-ps-compare-clear]")) {
+				saveCompare([]);
+				location.replace("/compare");
 				return;
 			}
 			var step = e.target.closest("[data-ps-step]");
@@ -620,6 +770,7 @@
 			return;
 		}
 		this.results.innerHTML = data.html;
+		syncCompare();
 		this.renderPager(data.items_count, data.page_length, data.start);
 	};
 
@@ -630,7 +781,7 @@
 			var a = document.createElement("a");
 			a.className = "ps-pill";
 			a.href = "/" + (c.route || "");
-			a.textContent = c.name;
+			a.textContent = c.label || c.name;
 			this.subcats.appendChild(a);
 		}, this);
 	};
@@ -703,6 +854,8 @@
 		$all("[data-ps-countdown]").forEach(initCountdown);
 		$all("[data-ps-gallery]").forEach(initGallery);
 		$all("[data-ps-listing]").forEach(function (root) { new Listing(root); });
+		$all("[data-ps-compare-page]").forEach(initComparePage);
+		syncCompare();
 		addShopLinkToEmptyStates();
 	});
 })();

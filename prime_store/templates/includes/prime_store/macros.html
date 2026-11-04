@@ -32,7 +32,6 @@
 {% macro product_card(item, settings) %}
 {%- set title = item.web_item_name or item.item_name or item.item_code -%}
 {%- set url = "/" ~ (item.route or "") -%}
-{%- set in_cart_label = _("In cart") if settings.enable_checkout else _("In quote") -%}
 {%- set out_of_stock = settings.show_stock_availability and not item.has_variants and not item.in_stock and not item.on_backorder -%}
 <article class="ps-card">
 	<div class="ps-card__stage">
@@ -47,14 +46,22 @@
 		<span class="ps-tag ps-tag--{{ item.prime_store_badge | lower | replace(' ', '-') }}">{{ _(item.prime_store_badge) }}</span>
 		{% endif %}
 		<div class="ps-card__corner">
-			{% if item.discount %}<span class="ps-off">{{ _("{0} OFF").format(item.discount) }}</span>{% endif %}
+			{# Webshop formats the percentage as "10.0%"; keep it short and left-to-right inside Arabic text. #}
+			{% if item.discount %}<span class="ps-off">{{ _("{0} OFF").format('<bdi dir="ltr">' ~ (item.discount | replace(".0%", "%")) ~ '</bdi>') }}</span>{% endif %}
+			{# Hover tools (desktop); on touch screens only the heart shows. #}
+			<a class="ps-card__tool ps-card__view" href="{{ url }}" aria-label="{{ _('View {0}').format(title) }}" title="{{ _('View product') }}">{{ icon("eye") }}</a>
+			{% if get_prime_store_settings().enable_compare %}
+			<button type="button" class="ps-card__tool ps-card__compare" data-ps-compare="{{ item.item_code }}" aria-pressed="false"
+				aria-label="{{ _('Compare {0}').format(title) }}" title="{{ _('Compare') }}">{{ icon("compare") }}</button>
+			{% endif %}
 			{% if settings.enabled and settings.enable_wishlist and not item.has_variants %}
-			<button type="button" class="ps-card__wish{{ ' is-active' if item.wished else '' }}"
+			<button type="button" class="ps-card__tool ps-card__wish{{ ' is-active' if item.wished else '' }}"
 				data-ps-wish="{{ item.item_code }}" aria-pressed="{{ 'true' if item.wished else 'false' }}"
-				aria-label="{{ _('Save {0} to wishlist').format(title) }}">{{ icon("heart") }}</button>
+				aria-label="{{ _('Save {0} to wishlist').format(title) }}" title="{{ _('Wishlist') }}">{{ icon("heart") }}</button>
 			{% endif %}
 		</div>
-		{% if out_of_stock %}<span class="ps-card__oos">{{ _("Out of stock") }}</span>{% endif %}
+		{% if out_of_stock %}<span class="ps-card__oos">{{ _("Out of stock") }}</span>
+		{% else %}{{ card_buy(item, settings, title, url, "ps-card__cta", True) }}{% endif %}
 	</div>
 	<div class="ps-card__body">
 		<div class="ps-card__top">
@@ -68,26 +75,49 @@
 		<div class="ps-card__foot">
 			{% if settings.show_price and item.formatted_price %}
 			<div class="ps-price">
-				<span class="ps-price__now">{{ item.formatted_price }}</span>
+				{# A template's price is its cheapest variant's, so say so. #}
+				<span class="ps-price__now">{{ _("Starting at {0}").format(item.formatted_price) if item.has_variants else item.formatted_price }}</span>
 				{% if item.formatted_mrp %}<s class="ps-price__was">{{ item.formatted_mrp }}</s>{% endif %}
 			</div>
 			{% endif %}
-			<div class="ps-card__actions">
-				{% if item.has_variants %}
-				<a class="ps-card__add" href="{{ url }}" aria-label="{{ _('Choose options') }}" title="{{ _('Choose options') }}">{{ icon("chevron") }}</a>
-				{% elif can_buy(item, settings) %}
-					{% if item.in_cart %}
-					<a class="ps-card__add is-added" href="/cart" aria-label="{{ in_cart_label }}" title="{{ in_cart_label }}">{{ icon("check") }}</a>
-					{% else %}
-					{%- set add_label = _("Add to cart") if settings.enable_checkout else _("Add to quote") -%}
-					<button type="button" class="ps-card__add" data-ps-add="{{ item.item_code }}" data-ps-added="{{ in_cart_label }}"
-						aria-label="{{ add_label }}: {{ title }}" title="{{ add_label }}">{{ icon("cart") }}</button>
-					{% endif %}
-				{% endif %}
+			{% if item.swatches %}
+			<div class="ps-swatches" role="group" aria-label="{{ _('Colors') }}">
+				{% for s in item.swatches %}
+				<button type="button" class="ps-swatch-dot{{ ' has-img' if s.image else '' }}" data-ps-swatch
+					{% if s.image %}data-img="{{ s.image | abs_url }}"{% endif %}
+					style="--sw: {{ s.value | lower | replace(' ', '') | e }}" aria-label="{{ _(s.value) }}" title="{{ _(s.value) }}">
+					{%- if s.image %}<img src="{{ s.image | abs_url }}" alt="" loading="lazy" width="28" height="28">{% endif -%}
+				</button>
+				{% endfor %}
+				{% if item.swatches_more %}<span class="ps-swatches__more">+{{ item.swatches_more }}</span>{% endif %}
 			</div>
+			{% endif %}
+			<div class="ps-card__actions">{{ card_buy(item, settings, title, url, "ps-card__add", False) }}</div>
 		</div>
 	</div>
 </article>
+{% endmacro %}
+
+{#- The card's buy control: a round icon button (foot, touch screens) or a full-width bar (stage, on hover). -#}
+{% macro card_buy(item, settings, title, url, cls, with_text) %}
+{%- set in_cart_label = _("In cart") if settings.enable_checkout else _("In quote") -%}
+{% if item.has_variants %}
+<a class="{{ cls }}" href="{{ url }}" aria-label="{{ _('Choose options') }}: {{ title }}" title="{{ _('Choose options') }}">
+	{{- icon("cart" if with_text else "chevron") }}{% if with_text %}<span>{{ _("Choose options") }}</span>{% endif -%}
+</a>
+{% elif can_buy(item, settings) %}
+	{% if item.in_cart %}
+	<a class="{{ cls }} is-added" href="/cart" aria-label="{{ in_cart_label }}" title="{{ in_cart_label }}">
+		{{- icon("check") }}{% if with_text %}<span>{{ in_cart_label }}</span>{% endif -%}
+	</a>
+	{% else %}
+	{%- set add_label = _("Add to cart") if settings.enable_checkout else _("Add to quote") -%}
+	<button type="button" class="{{ cls }}" data-ps-add="{{ item.item_code }}" data-ps-added="{{ in_cart_label }}"
+		aria-label="{{ add_label }}: {{ title }}" title="{{ add_label }}">
+		{{- icon("cart") }}{% if with_text %}<span>{{ add_label }}</span>{% endif -%}
+	</button>
+	{% endif %}
+{% endif %}
 {% endmacro %}
 
 {% macro skeleton_cards(n=8) %}

@@ -1,5 +1,15 @@
 {% from "templates/includes/prime_store/macros.html" import icon, skeleton_cards %}
 
+{#- Category tree for the sidebar: only the branch leading to the current group is expanded. -#}
+{% macro cat_tree(nodes, path, item_group) %}
+	{% for c in nodes %}
+	<li><a href="/{{ c.route }}"{% if item_group == c.name %} aria-current="page"{% endif %}>
+		{{ _(c.item_group_name or c.name) }} <small>({{ c.count }})</small></a>
+		{% if c.children and c.name in path %}<ul class="ps-catlist ps-catlist--sub">{{ cat_tree(c.children, path, item_group) }}</ul>{% endif %}
+	</li>
+	{% endfor %}
+{% endmacro %}
+
 {#- Product listing shell; prime_store.js fills results from prime_store.api.get_product_filter_data. -#}
 {% macro listing(title, field_filters, attribute_filters, clear_url, settings, item_group=None, description=None) %}
 {%- set search = frappe.form_dict.search or "" -%}
@@ -27,10 +37,7 @@
 						<summary>{{ _("Categories") }}{{ icon("chevron-down", "ps-i--sm") }}</summary>
 						<ul class="ps-catlist">
 							<li><a href="/all-products"{% if not item_group %} aria-current="page"{% endif %}>{{ _("All Products") }}</a></li>
-							{% for c in facets.categories %}
-							<li><a href="/{{ c.route }}"{% if item_group == c.name %} aria-current="page"{% endif %}>
-								{{ _(c.item_group_name or c.name) }} <small>({{ c.count }})</small></a></li>
-							{% endfor %}
+							{{ cat_tree(facets.categories, facets.category_path or [], item_group) }}
 						</ul>
 					</details>
 					{% endif %}
@@ -77,6 +84,8 @@
 									<input type="checkbox" name="attr:{{ attribute.name }}" value="{{ value }}">
 									<span class="ps-swatch" data-ps-swatch="{{ value }}" hidden></span>
 									<span>{{ _(value) }}</span>
+									{%- set n = (facets.attributes.get(attribute.name) or {}).get(value) -%}
+									{% if n %}<small class="ps-check__count">{{ n }}</small>{% endif %}
 								</label>
 								{% endfor %}
 							</div>

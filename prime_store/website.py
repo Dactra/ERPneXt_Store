@@ -3,6 +3,13 @@ from frappe import _
 from frappe.query_builder.functions import Avg, Count
 from frappe.utils import flt
 
+from prime_store.prime_store.doctype.prime_store_settings.prime_store_settings import get_settings
+
+
+def get_prime_store_settings():
+	"""Jinja helper: the storefront settings (Prime Store Settings)."""
+	return get_settings()
+
 
 def update_website_context(context):
 	"""Header/footer data for every web page. Must never break a page, so failures only log."""
@@ -10,27 +17,29 @@ def update_website_context(context):
 		context.ps = get_store_context()
 	except Exception:
 		frappe.log_error(title="Prime Store: website context")
-		context.ps = frappe._dict(categories=[], perks=[], social=[])
+		context.ps = frappe._dict(categories=[], category_tree=[], perks=[], social=[], compare_enabled=False)
 
 
 def get_store_context():
 	settings = frappe.get_cached_doc("Webshop Settings")
 	contact = frappe.get_cached_doc("Contact Us Settings")
+	store = get_settings()
+	tree = get_category_tree()
 	return frappe._dict(
-		categories=get_categories(),
-		# Feature strip and social links are per-client facts, so they only show when configured.
-		perks=[p for p in (frappe.conf.get("prime_store_perks") or []) if p],
-		social=[
-			{"label": label, "url": url}
-			for label, url in (frappe.conf.get("prime_store_social") or {}).items()
-			if url
-		],
+		# Top-level categories (a parent such as "Smart Home" counts its sub-categories' products).
+		categories=tree,
+		category_tree=tree,
+		signup_enabled=not frappe.db.get_single_value("Website Settings", "disable_signup"),
+		# Feature strip and social links are per-client facts (Prime Store Settings); hidden when empty.
+		perks=store.perks,
+		social=store.social,
+		compare_enabled=store.enable_compare,
 		cart_enabled=settings.enabled,
 		checkout_enabled=settings.enable_checkout,
 		wishlist_enabled=settings.enabled and settings.enable_wishlist,
 		email=contact.email_id,
 		phone=contact.phone,
-		shop_url=frappe.conf.get("prime_store_shop_url") or "/all-products",
+		shop_url=store.shop_url,
 		site_name=get_site_name(settings),
 		address=frappe.db.get_single_value("Website Settings", "address"),
 		trending=get_trending_menu(),
@@ -101,14 +110,14 @@ def get_listing_facets(item_group=None):
 		return _listing_facets(item_group)
 	except Exception:
 		frappe.log_error(title="Prime Store: listing facets")
-		return {"categories": [], "brands": {}, "tags": [], "ratings": []}
+		return {"categories": [], "brands": {}, "tags": [], "ratings": [], "attributes": {}}
 
 
 def _listing_facets(item_group):
 	item = frappe.qb.DocType("Website Item")
 	scope = item.published == 1
 	if item_group:
-		scope &= item.item_group == item_group
+		scope &= item.item_group.isin(get_descendant_groups(item_group))
 
 	brand_counts = dict(
 		frappe.qb.from_(item).select(item.brand, Count(item.name))
@@ -136,11 +145,31 @@ def _listing_facets(item_group):
 		]
 		ratings = [(stars, sum(1 for a in averages if a >= stars)) for stars in (4, 3, 2, 1)] if averages else []
 
+	# Products per attribute value (Color, Storage...): a template counts once however many variants match.
+	variant = frappe.qb.DocType("Item")
+	attr = frappe.qb.DocType("Item Variant Attribute")
+	product = item.item_code if not frappe.get_cached_doc("Webshop Settings").hide_variants else variant.variant_of
+	rows = (
+		frappe.qb.from_(attr)
+		.join(variant).on(attr.parent == variant.name)
+		.join(item).on(item.item_code == product)
+		.select(attr.attribute, attr.attribute_value, Count(item.name).distinct())
+		.where(scope & attr.attribute_value.isnotnull() & (variant.published_in_website == 1))
+		.groupby(attr.attribute, attr.attribute_value)
+		.run()
+	)
+	attributes = {}
+	for attribute, value, n in rows:
+		attributes.setdefault(attribute, {})[value] = n
+
 	return {
-		"categories": get_categories(limit=50),
+		"categories": get_category_tree(),
+		# The open branch of the category tree: the current group and its parents.
+		"category_path": get_group_path(item_group),
 		"brands": {name: {"count": n, "image": brand_images.get(name)} for name, n in brand_counts.items()},
 		"tags": tags,
 		"ratings": ratings,
+		"attributes": attributes,
 	}
 
 
@@ -168,19 +197,74 @@ def get_categories(limit=12):
 		order_by="lft asc",
 		limit=limit,
 	)
-	counts = {}
-	if groups:
-		item = frappe.qb.DocType("Website Item")
-		counts = dict(
-			frappe.qb.from_(item)
-			.select(item.item_group, Count(item.name))
-			.where((item.published == 1) & item.item_group.isin([g.name for g in groups]))
-			.groupby(item.item_group)
-			.run()
-		)
+	counts = get_group_counts([g.name for g in groups])
 	for g in groups:
 		g.count = counts.get(g.name, 0)
 	return groups
+
+
+def get_group_counts(group_names):
+	"""{item_group: listed products}; hidden variants don't count as separate products."""
+	if not group_names:
+		return {}
+	item = frappe.qb.DocType("Website Item")
+	condition = (item.published == 1) & item.item_group.isin(group_names)
+	if frappe.get_cached_doc("Webshop Settings").hide_variants:
+		condition &= item.variant_of.isnull() | (item.variant_of == "")
+	return dict(
+		frappe.qb.from_(item).select(item.item_group, Count(item.name)).where(condition).groupby(item.item_group).run()
+	)
+
+
+def get_descendant_groups(item_group):
+	"""The group and every group under it (for counts that include sub-categories)."""
+	bounds = frappe.db.get_value("Item Group", item_group, ["lft", "rgt"], as_dict=True)
+	if not bounds:
+		return [item_group]
+	return frappe.get_all(
+		"Item Group", filters={"lft": [">=", bounds.lft], "rgt": ["<=", bounds.rgt]}, pluck="name"
+	)
+
+
+def get_group_path(item_group):
+	path = []
+	while item_group and item_group not in path:
+		path.append(item_group)
+		item_group = frappe.db.get_value("Item Group", item_group, "parent_item_group")
+	return path
+
+
+def get_category_tree():
+	"""Website item groups as a tree for the mobile menu; a parent counts its children's products."""
+	groups = frappe.get_all(
+		"Item Group",
+		filters={"show_in_website": 1},
+		fields=["name", "item_group_name", "route", "image", "parent_item_group", "lft"],
+		order_by="lft asc",
+	)
+	by_name = {g.name: g for g in groups}
+	counts = get_group_counts(list(by_name))
+	for g in groups:
+		g.count = counts.get(g.name, 0)
+		g.children = []
+	top = []
+	for g in groups:
+		parent = by_name.get(g.parent_item_group)
+		(parent.children if parent else top).append(g)
+
+	def total(node):
+		node.count += sum(total(child) for child in node.children)
+		return node.count
+
+	def prune(nodes):
+		kept = [n for n in nodes if n.count]
+		for n in kept:
+			n.children = prune(n.children)
+		return kept
+
+	for node in top:
+		total(node)
+	return prune(top)
 
 
 def get_products(item_group=None, exclude=None, limit=8, sort=None):
@@ -201,6 +285,19 @@ def get_related_products(doc, limit=4):
 	except Exception:
 		frappe.log_error(title="Prime Store: related products")
 		return []
+
+
+def get_starting_price(item_code):
+	"""Jinja helper: a template's cheapest variant price, formatted (templates have no Item Price)."""
+	from frappe.utils import fmt_money
+
+	from prime_store.api import get_list_prices
+
+	price_list = frappe.get_cached_doc("Webshop Settings").price_list
+	rate = get_list_prices([item_code], price_list).get(item_code)
+	if rate is None:
+		return None
+	return fmt_money(rate, currency=frappe.db.get_value("Price List", price_list, "currency"))
 
 
 def get_webshop_settings():

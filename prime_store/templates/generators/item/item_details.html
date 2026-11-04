@@ -10,11 +10,17 @@
 			{% endif %}
 			<h1 class="ps-product__title" itemprop="name">{{ _(doc.web_item_name) }}</h1>
 		</div>
-		{% if cart_settings.enabled and cart_settings.enable_wishlist and not has_variants %}
-		<button type="button" class="ps-iconbtn ps-product__wish{{ ' is-active' if wished else '' }}"
-			data-ps-wish="{{ doc.item_code }}" aria-pressed="{{ 'true' if wished else 'false' }}"
-			aria-label="{{ _('Save to wishlist') }}">{{ icon("heart") }}</button>
-		{% endif %}
+		<div class="ps-product__tools">
+			{% if ps.compare_enabled %}
+			<button type="button" class="ps-iconbtn ps-product__compare" data-ps-compare="{{ doc.item_code }}" aria-pressed="false"
+				aria-label="{{ _('Compare') }}" title="{{ _('Compare') }}">{{ icon("compare") }}</button>
+			{% endif %}
+			{% if cart_settings.enabled and cart_settings.enable_wishlist and not has_variants %}
+			<button type="button" class="ps-iconbtn ps-product__wish{{ ' is-active' if wished else '' }}"
+				data-ps-wish="{{ doc.item_code }}" aria-pressed="{{ 'true' if wished else 'false' }}"
+				aria-label="{{ _('Save to wishlist') }}">{{ icon("heart") }}</button>
+			{% endif %}
+		</div>
 	</div>
 
 	<p class="ps-product__meta">
@@ -32,6 +38,8 @@
 	{% if doc.short_description %}<p class="ps-product__lead">{{ doc.short_description }}</p>{% endif %}
 
 	{% if has_variants %}
+		{%- set from_price = get_starting_price(doc.item_code) if cart_settings.show_price else None -%}
+		{% if from_price %}<div class="ps-price ps-price--lg"><span class="ps-price__now">{{ _("Starting at {0}").format(from_price) }}</span></div>{% endif %}
 		{% include "templates/generators/item/item_configure.html" %}
 	{% else %}
 		{% include "templates/generators/item/item_add_to_cart.html" %}

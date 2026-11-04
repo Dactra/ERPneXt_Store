@@ -1,0 +1,78 @@
+{% extends "templates/web.html" %}
+{% from "templates/includes/prime_store/macros.html" import icon, card_buy, stars, stock_label %}
+
+{% block title %}{{ _("Compare products") }}{% endblock %}
+
+{% block page_content %}
+<div class="ps ps-compare" data-ps-compare-page data-items="{{ items | map(attribute='item_code') | join(',') }}">
+	<header class="ps-listing__head">
+		<h1>{{ _("Compare products") }}</h1>
+		{% if items %}
+		<p class="ps-listing__count">{{ _("1 product") if items | length == 1 else _("{0} products").format(items | length) }}</p>
+		<button type="button" class="ps-btn ps-btn--ghost ps-btn--sm ps-compare__clear" data-ps-compare-clear>{{ _("Clear all") }}</button>
+		{% endif %}
+	</header>
+
+	{% if items %}
+	<div class="ps-compare__scroll" tabindex="0" role="region" aria-label="{{ _('Compare products') }}">
+		<table class="ps-compare__table">
+			<thead>
+				<tr>
+					<th scope="col"><span class="sr-only">{{ _("Product") }}</span></th>
+					{% for item in items %}
+					{%- set title = item.web_item_name or item.item_name or item.item_code -%}
+					{%- set url = "/" ~ (item.route or "") -%}
+					<td>
+						<div class="ps-compare__prod">
+							<button type="button" class="ps-iconbtn ps-compare__remove" data-ps-compare-remove="{{ item.item_code }}"
+								aria-label="{{ _('Remove {0} from comparison').format(title) }}" title="{{ _('Remove') }}">{{ icon("close") }}</button>
+							<a class="ps-compare__img" href="{{ url }}" tabindex="-1" aria-hidden="true">
+								{%- if item.website_image %}<img src="{{ item.website_image | abs_url }}" alt="" width="200" height="200" loading="lazy">
+								{%- else %}<span class="ps-card__abbr">{{ frappe.utils.get_abbr(title) }}</span>{% endif -%}
+							</a>
+							<a class="ps-compare__name" href="{{ url }}">{{ title }}</a>
+							{% if settings.show_price and item.formatted_price %}
+							<div class="ps-price">
+								<span class="ps-price__now">{{ _("Starting at {0}").format(item.formatted_price) if item.has_variants else item.formatted_price }}</span>
+								{% if item.formatted_mrp %}<s class="ps-price__was">{{ item.formatted_mrp }}</s>{% endif %}
+							</div>
+							{% endif %}
+							{{ card_buy(item, settings, title, url, "ps-btn ps-btn--sm ps-btn--block", True) }}
+						</div>
+					</td>
+					{% endfor %}
+				</tr>
+			</thead>
+			<tbody>
+				<tr><th scope="row">{{ _("Brand") }}</th>{% for item in items %}<td>{{ item.brand or "—" }}</td>{% endfor %}</tr>
+				<tr><th scope="row">{{ _("Category") }}</th>{% for item in items %}<td>{{ _(item.item_group) if item.item_group else "—" }}</td>{% endfor %}</tr>
+				{% if settings.show_stock_availability %}
+				<tr><th scope="row">{{ _("Availability") }}</th>{% for item in items %}<td>{{ stock_label(item, settings) or "—" }}</td>{% endfor %}</tr>
+				{% endif %}
+				{% if settings.enable_reviews %}
+				<tr><th scope="row">{{ _("Rating") }}</th>{% for item in items %}<td>{% if item.rating %}{{ stars(item.rating | float, item.reviews) }}{% else %}—{% endif %}</td>{% endfor %}</tr>
+				{% endif %}
+				{% for attribute in attributes %}
+				<tr><th scope="row">{{ _(attribute) }}</th>
+					{% for item in items %}<td>{% if item.specs[attribute] %}{% for v in item.specs[attribute] %}{{ _(v) }}{{ "، " if not loop.last }}{% endfor %}{% else %}—{% endif %}</td>{% endfor %}
+				</tr>
+				{% endfor %}
+				{%- set descs = items | map(attribute="short_description") | select | list -%}
+				{% if descs %}
+				<tr><th scope="row">{{ _("Description") }}</th>
+					{% for item in items %}<td class="ps-compare__desc">{{ (item.short_description or "") | striptags | truncate(220) or "—" }}</td>{% endfor %}
+				</tr>
+				{% endif %}
+			</tbody>
+		</table>
+	</div>
+	{% else %}
+	<div class="ps-state">
+		<span class="ps-state__icon">{{ icon("compare") }}</span>
+		<h2>{{ _("No products to compare yet") }}</h2>
+		<p>{{ _("Use the compare button on any product to add it here (up to {0} products).").format(4) }}</p>
+		<a class="ps-btn" href="{{ ps.shop_url or '/all-products' }}">{{ _("Continue shopping") }}</a>
+	</div>
+	{% endif %}
+</div>
+{% endblock %}
